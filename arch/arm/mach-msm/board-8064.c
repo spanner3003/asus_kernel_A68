@@ -763,7 +763,7 @@ static void __init reserve_ion_memory(void)
 
 		if (heap->extra_data) {
 			int fixed_position = NOT_FIXED;
-			struct ion_cp_heap_pdata *pdata;
+			struct ion_cp_heap_pdata *pdata = NULL;
 
 			switch (heap->type) {
 			case ION_HEAP_TYPE_CP:

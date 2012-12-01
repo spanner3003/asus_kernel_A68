@@ -1422,7 +1422,7 @@ static int smux_handle_rx_status_cmd(struct smux_pkt_t *pkt)
 static int smux_handle_rx_power_cmd(struct smux_pkt_t *pkt)
 {
 	int tx_ready = 0;
-	struct smux_pkt_t *ack_pkt;
+	struct smux_pkt_t *ack_pkt = NULL;
 
 	spin_lock(&smux.tx_lock_lha2);
 	if (pkt->hdr.flags & SMUX_CMD_PWR_CTL_ACK) {

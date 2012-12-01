@@ -590,7 +590,7 @@ static void __init reserve_ion_memory(void)
 
 		if (heap->extra_data) {
 			int fixed_position = NOT_FIXED;
-			struct ion_cp_heap_pdata *pdata;
+			struct ion_cp_heap_pdata *pdata = NULL;
 
 			switch (heap->type) {
 			case ION_HEAP_TYPE_CP:
@@ -1787,7 +1787,7 @@ static struct attribute_group mxt224e_properties_attr_group = {
 
 static void mxt_init_vkeys_8930(void)
 {
-	int rc;
+	int rc = 0;
 	static struct kobject *mxt224e_properties_kobj;
 
 	mxt224e_vkeys_attr.attr.name = "virtualkeys.atmel_mxt_ts";

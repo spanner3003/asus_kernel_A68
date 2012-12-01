@@ -3272,7 +3272,7 @@ static void SiiMhlTxParseStandardTiming(PEDID_Block0_t pEdidBlock0)
         else
         {
         uint16_t horzActive=(uint16_t)((pEdidBlock0->standardTimings[i].horzPixDiv8Minus31 + 31)*8);
-        uint16_t vertActive;
+        uint16_t vertActive = 0;
         uint16_t refreshRateInMilliHz = (uint16_t)(pEdidBlock0->standardTimings[i].fieldRefreshRateMinus60+ 60)*1000;
         char *pszRatioString="";
 

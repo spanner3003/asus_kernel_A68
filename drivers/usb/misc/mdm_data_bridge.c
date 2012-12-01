@@ -1321,7 +1321,7 @@ static void data_bridge_write_cb_asus(struct urb *urb)
 
 static void data_bridge_process_rx_asus(struct work_struct *work)
 {
-	int			retval;
+	int			retval = 0;
 	unsigned long		flags;
 	struct urb		*rx_idle;
 	struct sk_buff		*skb;
