@@ -1,7 +1,9 @@
 ###########################################################
 # set kernel version
 ###########################################################
-BUILD_VERSION=g3b38a2c-00001-g75918c5
+TARGET_DEVICE=Padfone2-jellybean
+BUILD_MOD=KBC
+BUILD_VERSION=V1.0.0
 BUILD_RECOVERY_VER=CWM-V6.0.1.5
 
 
@@ -17,7 +19,10 @@ export KBUILD_BUILD_HOST="Homura"
 # don't edit
 ###########################################################
 # release build
-export BUILD_LOCALVERSION="$BUILD_VERSION"
+if [ ! "$RELEASE_BUILD" = 'y' ]; then
+  BUILD_VERSION=`date +%Y%m%d`
+fi
+# export BUILD_LOCALVERSION="$TARGET_DEVICE-$BUILD_MOD-$BUILD_VERSION-$BUILD_TARGET"
 export BUILD_RECOVERYVERSION="$TARGET_DEVICE-$BUILD_MOD-$BUILD_RECOVERY_VER"
 
 # kernel vesion
