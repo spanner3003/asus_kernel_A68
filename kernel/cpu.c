@@ -290,7 +290,7 @@ EXPORT_SYMBOL(cpu_down);
 #endif /*CONFIG_HOTPLUG_CPU*/
 
 /* Requires cpu_add_remove_lock to be held */
-static int __cpuinit _cpu_up(unsigned int cpu, int tasks_frozen)
+static int __ref _cpu_up(unsigned int cpu, int tasks_frozen)
 {
 	int ret, nr_calls = 0;
 	void *hcpu = (void *)(long)cpu;
@@ -325,7 +325,7 @@ out_notify:
 	return ret;
 }
 
-int __cpuinit cpu_up(unsigned int cpu)
+int __ref cpu_up(unsigned int cpu)
 {
 	int err = 0;
 

@@ -169,6 +169,9 @@ struct smb346_platform_data{
 #define A68_ECOM_GPIO_IRQ_AMI306_SR1_1 33
 #define A68_GYRO_GPIO_IRQ_MPU6050_SR1_1 28
 
+#ifdef CONFIG_CPU_FREQ_GOV_INTELLIDEMAND
+int id_set_two_phase_freq(int cpufreq);
+#endif
 
 static struct regulator *pm8921_l9;
 static struct regulator *pm8921_lvs4;
@@ -4035,6 +4038,11 @@ static void __init apq8064_rumi3_init(void)
 
 static void __init apq8064_cdp_init(void)
 {
+
+#ifdef CONFIG_CPU_FREQ_GOV_INTELLIDEMAND
+	id_set_two_phase_freq(1134000);
+#endif
+
 	if (meminfo_init(SYS_MEMORY, SZ_256M) < 0)
 		pr_err("meminfo_init() failed!\n");
 //ASUS_BSP simpson: unset unused touchscreen setting +++
