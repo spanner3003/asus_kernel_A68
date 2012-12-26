@@ -173,7 +173,6 @@ static struct acpu_level acpu_freq_tbl_slow[] __initdata = {
 #ifdef CONFIG_CPU_OVERCLOCK
 	{ 1, {  1620000, HFPLL, 1, 0, 0x3C }, L2(14), 1300000 },
 	{ 1, {  1728000, HFPLL, 1, 0, 0x40 }, L2(14), 1350000 },
-	{ 1, {  1836000, HFPLL, 1, 0, 0x44 }, L2(14), 1400000 },
 #endif
 	{ 0, { 0 } }
 };
@@ -204,7 +203,6 @@ static struct acpu_level acpu_freq_tbl_nom[] __initdata = {
 #ifdef CONFIG_CPU_OVERCLOCK
 	{ 1, {  1620000, HFPLL, 1, 0, 0x3C }, L2(14), 1250000 },
 	{ 1, {  1728000, HFPLL, 1, 0, 0x40 }, L2(14), 1300000 },
-	{ 1, {  1836000, HFPLL, 1, 0, 0x44 }, L2(14), 1350000 },
 #endif
 	{ 0, { 0 } }
 };
@@ -235,7 +233,6 @@ static struct acpu_level acpu_freq_tbl_fast[] __initdata = {
 #ifdef CONFIG_CPU_OVERCLOCK
 	{ 1, {  1620000, HFPLL, 1, 0, 0x3C }, L2(14), 1200000 },
 	{ 1, {  1728000, HFPLL, 1, 0, 0x40 }, L2(14), 1250000 },
-	{ 1, {  1836000, HFPLL, 1, 0, 0x44 }, L2(14), 1300000 },
 #endif
 	{ 0, { 0 } }
 };
