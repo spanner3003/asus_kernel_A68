@@ -2007,7 +2007,11 @@ static struct platform_device msm_tsens_device = {
 static struct msm_thermal_data msm_thermal_pdata = {
 	.sensor_id = 7,
 	.poll_ms = 1000,
+#ifdef CONFIG_CPU_OVERCLOCK
+	.limit_temp = 75,
+#else
 	.limit_temp = 60,
+#endif
 	.temp_hysteresis = 10,
 	.limit_freq = 918000,
 };
@@ -2136,13 +2140,21 @@ static struct msm_rpmrs_platform_data msm_rpmrs_data __initdata = {
 		[MSM_RPMRS_VDD_MEM_RET_LOW]	= 750000,
 		[MSM_RPMRS_VDD_MEM_RET_HIGH]	= 750000,
 		[MSM_RPMRS_VDD_MEM_ACTIVE]	= 1050000,
+#ifdef CONFIG_CPU_OVERCLOCK
+		[MSM_RPMRS_VDD_MEM_MAX]		= 1250000,
+#else
 		[MSM_RPMRS_VDD_MEM_MAX]		= 1150000,
+#endif
 	},
 	.vdd_dig_levels = {
 		[MSM_RPMRS_VDD_DIG_RET_LOW]	= 500000,
 		[MSM_RPMRS_VDD_DIG_RET_HIGH]	= 750000,
 		[MSM_RPMRS_VDD_DIG_ACTIVE]	= 950000,
+#ifdef CONFIG_CPU_OVERCLOCK
+		[MSM_RPMRS_VDD_DIG_MAX]		= 1250000,
+#else
 		[MSM_RPMRS_VDD_DIG_MAX]		= 1150000,
+#endif
 	},
 	.vdd_mask = 0x7FFFFF,
 	.rpmrs_target_id = {
