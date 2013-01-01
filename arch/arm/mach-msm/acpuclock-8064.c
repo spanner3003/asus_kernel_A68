@@ -554,8 +554,7 @@ static struct acpuclk_krait_params acpuclk_8064_params __initdata = {
 
 static int __init acpuclk_8064_probe(struct platform_device *pdev)
 {
-	if (cpu_is_apq8064ab() ||
-		SOCINFO_VERSION_MAJOR(socinfo_get_version()) == 2) {
+	if (SOCINFO_VERSION_MAJOR(socinfo_get_version()) == 2) {
 		acpuclk_8064_params.hfpll_data->low_vdd_l_max = 37;
 		acpuclk_8064_params.hfpll_data->nom_vdd_l_max = 74;
 	}
