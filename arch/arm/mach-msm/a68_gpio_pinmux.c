@@ -11,6 +11,7 @@
 #include "a68_pr_gpio_pinmux.h"
 #include "a68_pr2_gpio_pinmux.h"
 #include "a68_mp_gpio_pinmux.h"
+#include "a68_cd_gpio_pinmux.h"
 #include "a80_evb_gpio_pinmux.h"
 
 #define PM8921_GPIO_BASE        NR_GPIO_IRQS
@@ -128,7 +129,16 @@ int __init device_gpio_init(void)
 		   msm_gpiomux_install(a68_mp_msm8960_gpio_configs,
                 ARRAY_SIZE(a68_mp_msm8960_gpio_configs));	 	  
                break;
+			   
+		case A68_CD:
+                printk("a68 gpio config table = CD\n");  
 
+		g_GPIO_MHL_RST_N = 43;  /* ASUS_BSP larry_lai : EVB/SR1_1 for MHL Reset */
+		   
+		   msm_gpiomux_install(a68_cd_msm8960_gpio_configs,
+                ARRAY_SIZE(a68_cd_msm8960_gpio_configs));	 	  
+               break;
+			   
 		case A80_EVB:
 		case A80_SR1:
                 printk("a80 gpio config table = EVB\n");

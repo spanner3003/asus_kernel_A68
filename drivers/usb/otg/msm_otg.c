@@ -204,15 +204,21 @@ int CarKitNotifyInitialize(void)
 //ASUS_BSP--- BennyCheng "add phone mode usb OTG support"
 
 //ASUS_BSP+++ BennyCheng "usb host porting for pad mode"
-static void msm_otg_vbus_out_enable(bool enable)
+static void msm_otg_vbus_out_enable(bool enable, bool force)
 {
+	struct msm_otg *motg = the_msm_otg;
 #ifdef CONFIG_ASUS_USB_OTG
-	if (enable) {
-		UsbSetOtgSwitch(true);
+	if (force) {
+		UsbSetOtgSwitch(enable);
 	} else {
-		UsbSetOtgSwitch(false);
+		if (!AX_MicroP_IsP01Connected() || !pad_exist()) {
+			UsbSetOtgSwitch(enable);
+		} else {
+			dev_info(motg->phy.dev, "ignore to set vbus enable in pad (%d)\n", enable);
+		}
 	}
 #else
+	dev_info(motg->phy.dev, "phone mode otg is not enabled (%d)\n", enable);
 	return;
 #endif
 }
@@ -467,7 +473,7 @@ void msm_otg_host_power_off(void)
 			if (AX_MicroP_IsP01Connected() && pad_exist()) {
 				msm_otg_set_microp_mode(MICROP_SLEEP);
 			} else {
-				msm_otg_vbus_out_enable(false);
+				msm_otg_vbus_out_enable(false, 0);
 			}
 		}
 		dev_info(phy->dev, "%s()---\n", __func__);
@@ -515,7 +521,7 @@ static void msm_otg_early_suspend_delay_work(struct work_struct *w)
 		//ASUS_BSP+++ BennyCheng "add phone mode usb OTG support"
 		if (!g_keep_power_on) {
 			msm_otg_host_auto_switch(HOST_AUTO_NONE);
-			msm_otg_vbus_out_enable(false);
+			msm_otg_vbus_out_enable(false, 0);
 		} else {
 			/*
 			 * If a usb storage is plugged, unlocking lock here to allow the usb storgae enter pm suspend and
@@ -592,7 +598,7 @@ static void usb_pad_hub_late_resume(struct early_suspend *h)
 			msm_otg_set_pad_camera_power(1);
 		} else {
 			//ASUS_BSP+++ BennyCheng "add phone mode usb OTG support"
-			msm_otg_vbus_out_enable(true);
+			msm_otg_vbus_out_enable(true, 0);
 			//ASUS_BSP--- BennyCheng "add phone mode usb OTG support"
 		}
 
@@ -864,10 +870,8 @@ static void ulpi_init(struct msm_otg *motg)
 		return;
 
 //ASUS_BSP+++ "[USB][NA][Other] modify phy_init_seq for ER1"
-	if((g_A68_hwID>=A68_ER1) && (g_A68_hwID<=A68_MP)){
-		pdata->phy_init_seq[0]=0x6c;
-		pdata->phy_init_seq[1]=0x81;
-	}
+	pdata->phy_init_seq[0]=0x6c;
+	pdata->phy_init_seq[1]=0x81;
 //ASUS_BSP--- "[USB][NA][Other] modify phy_init_seq for ER1"
 
 	while (seq[0] >= 0) {
@@ -2388,6 +2392,8 @@ static void msm_chg_block_on(struct msm_otg *motg)
 		udelay(20);
 		break;
 	case SNPS_28NM_INTEGRATED_PHY:
+		/* disable DP and DM pull down resistors */
+		ulpi_write(phy, 0x6, 0xC);
 		/* Clear charger detecting control bits */
 		ulpi_write(phy, 0x1F, 0x86);
 		/* Clear alt interrupt latch and enable bits */
@@ -2493,8 +2499,7 @@ static void msm_chg_detect_work(struct work_struct *w)
 	switch (motg->chg_state) {
 	case USB_CHG_STATE_UNDEFINED:
 		msm_chg_block_on(motg);
-		if (motg->pdata->enable_dcd)
-			msm_chg_enable_dcd(motg);
+		msm_chg_enable_dcd(motg);
 		msm_chg_enable_aca_det(motg);
 		motg->chg_state = USB_CHG_STATE_WAIT_FOR_DCD;
 		motg->dcd_retries = 0;
@@ -2514,12 +2519,10 @@ static void msm_chg_detect_work(struct work_struct *w)
 				break;
 			}
 		}
-		if (motg->pdata->enable_dcd)
-			is_dcd = msm_chg_check_dcd(motg);
+		is_dcd = msm_chg_check_dcd(motg);
 		tmout = ++motg->dcd_retries == MSM_CHG_DCD_MAX_RETRIES;
 		if (is_dcd || tmout) {
-			if (motg->pdata->enable_dcd)
-				msm_chg_disable_dcd(motg);
+			msm_chg_disable_dcd(motg);
 			msm_chg_enable_primary_det(motg);
 			delay = MSM_CHG_PRIMARY_DET_TIME;
 			motg->chg_state = USB_CHG_STATE_DCD_DONE;
@@ -2727,17 +2730,17 @@ static void msm_otg_sm_work(struct work_struct *w)
 
 	if (g_otg_mode == ASUS_OTG_CONNECT) {
 		set_bit(B_SESS_VLD, &motg->inputs);//temp set VBUS to detect Charger
-		msm_otg_vbus_out_enable(true);
+		msm_otg_vbus_out_enable(true, 0);
 	} else if (g_otg_mode == ASUS_OTG_DISCONNECT) {
 		clear_bit(B_SESS_VLD, &motg->inputs);
 		g_otg_mode = ASUS_OTG_NONE;
+		msm_otg_vbus_out_enable(false, 0);
 		if (g_carkit_state) {
 			g_carkit_state=0;
 			switch_set_state(&switch_otg_carkit, 0);
 		} else if (g_host_mode) {
 			msm_otg_host_mode_cleanup();
 			msm_otg_mode_switch(USB_AUTO);
-			msm_otg_vbus_out_enable(false);
 		}
 	} else if(g_otg_mode == ASUS_OTG_CARKIT && msm_otg_bsv ){//notify carkit charger
 		ASUSEvtlog("[USB] OTG set_chg_mode: Carkit\n");
@@ -2793,7 +2796,7 @@ static void msm_otg_sm_work(struct work_struct *w)
 					if (g_otg_mode == ASUS_OTG_CONNECT) {
 						g_otg_mode = ASUS_OTG_CARKIT;
 						g_carkit_state = 1;
-						msm_otg_vbus_out_enable(false);
+						msm_otg_vbus_out_enable(false, 0);
 						switch_set_state(&switch_otg_carkit, 1);
 						if(msm_otg_bsv){//notify carkit charger
 							ASUSEvtlog("[USB] OTG set_chg_mode: Carkit\n");
@@ -3886,6 +3889,10 @@ static int usb_otg_microp_event(struct notifier_block *this, unsigned long event
 
 			msm_otg_apq_mdm_switch(USB_APQ);
 			msm_otg_usb_mhl_switch(MHL_PORT);
+
+#ifdef CONFIG_ASUS_USB_OTG
+			msm_otg_vbus_out_enable(false, 1);
+#endif
 
 			msm_otg_set_pad_camera_power(0);
 			msm_otg_set_pad_hub_power(0);

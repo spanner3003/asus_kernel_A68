@@ -25,6 +25,13 @@
 #include <linux/leds.h>
 #include <linux/leds-pm8xxx.h>
 #include <linux/workqueue.h>
+
+//ASUS_BSP HANS: add for PWM +++
+#include <linux/pwm.h>
+static struct pwm_device *pwmb;
+#define PERIOD 1000
+//ASUS_BSP HANS: add for PWM ---
+
 struct workqueue_struct *keypad_bl_workqueue;
 struct delayed_work keypad_off_work;
 #define F11_LED_MAX_LEVEL 20		//2mA per level
@@ -33,7 +40,7 @@ struct delayed_work keypad_off_work;
 #define F11_3LEVEL_LED 0
 #define F11_DEFAULT_LED_HI 10	//default 20mA,  => samsung S3, 6.7mA/LED, 6.7*3=20mA
 #define F11_DEFAULT_LED_BASIC 0
-#define F11_DEFAULT_LED_HI_W 1	//wTP-default 2mA
+#define F11_DEFAULT_LED_HI_W 2	//wTP-default
 #if F11_3LEVEL_LED
 #define F11_DEFAULT_LED_LOW 5
 #define F11_DEFAULT_LED_DIFF 5	//F11_DEFAULT_LED_HI - F11_DEFAULT_LED_LOW
@@ -771,6 +778,9 @@ static int rmi_f11_virtual_button_handler(struct f11_2d_sensor *sensor)
 //ASUS_BSP simpson: add for keypad_bl +++
 DEFINE_LED_TRIGGER_GLOBAL(keypad_led_trigger);
 void rmi_led_trigger_event(struct led_trigger *trigger, enum led_brightness event){
+
+	int duty_time = 0; //ASUS_BSP HANS:add for PWM ++
+
 	if ((user_level_shift > 0) && (event > F11_DEFAULT_LED_HI_W)){	//limit wTP ICON @F11_DEFAULT_LED_HI_W
 		event = F11_DEFAULT_LED_HI_W;
 	}
@@ -778,11 +788,17 @@ void rmi_led_trigger_event(struct led_trigger *trigger, enum led_brightness even
 		event = F11_DEFAULT_LED_BASIC;
 
 	if (g_bIsSuspended == true) {
-		printk("[touch_synaptics] rmi_f11 suspended, no trigger LED (%d)\n", event);
+		rmi_debug(DEBUG_VERBOSE, "[touch_synaptics] rmi_f11 suspended, no trigger LED (%d)\n", event);
 		event = 0;
 	}
 
-	printk("[touch_synaptics] rmi_f11 trigger LED (%d)\n", event);
+	rmi_debug(DEBUG_VERBOSE, "[touch_synaptics] rmi_f11 trigger LED (%d)\n", event);
+
+	//ASUS_BSP HANS: add for PWM +++
+	duty_time = (event*PERIOD)/20;
+	pwm_config(pwmb,duty_time,PERIOD);
+	//ASUS_BSP HANS: add for PWM ---
+
 	led_trigger_event(trigger, event);
 	led_level_now = event;
 }
@@ -797,22 +813,22 @@ EXPORT_SYMBOL(turnoff_keypad_bl);
 static void rmi_early_suspend(struct early_suspend *handler)
 {
 
-	printk("[touch_synaptics] rmi_f11_early_suspend ++\n");
+	rmi_debug(DEBUG_INFO, "[touch_synaptics] rmi_f11_early_suspend ++\n");
 
 	if ( g_bFoneInPad != false ){
-		printk("[touch_synaptics] PadAttached! Turn-off keypad backlight anyway!\n");
+		rmi_debug(DEBUG_INFO, "[touch_synaptics] PadAttached! Turn-off keypad backlight anyway!\n");
 	}
 	//force turn-off keypad_backlight ++
 	if(delayed_work_pending(&keypad_off_work)) {
 		cancel_delayed_work_sync(&keypad_off_work);
 	}
 	rmi_led_trigger_event(keypad_led_trigger, 0);
-	printk("[touch_synaptics] F11 force turn-off keypad_backlight\n");
+	rmi_debug(DEBUG_VERBOSE, "[touch_synaptics] F11 force turn-off keypad_backlight\n");
 	//force turn-off keypad_backlight --
 	unlock1time = 0;
 	g_bIsSuspended = true;
 
-	printk("[touch_synaptics] rmi_f11_early_suspend --\n");
+	rmi_debug(DEBUG_INFO, "[touch_synaptics] rmi_f11_early_suspend --\n");
 
 }
 
@@ -823,7 +839,7 @@ static int rmi_f11_resume(struct rmi_function_container *fc);
 static void rmi_late_resume(struct early_suspend *handler)
 {
 
-	printk("[touch_synaptics] rmi_f11_late_resume ++\n");
+	rmi_debug(DEBUG_INFO, "[touch_synaptics] rmi_f11_late_resume ++\n");
 
 	if ( g_bFoneInPad == false ){
 		#if RESUME_REZERO
@@ -840,10 +856,10 @@ static void rmi_late_resume(struct early_suspend *handler)
 		queue_delayed_work(keypad_bl_workqueue, &keypad_off_work, msecs_to_jiffies(user_duration));
 	g_bIsSuspended = false;
 	} else {
-		printk("[touch_synaptics] PadAttached!\n");
+		rmi_debug(DEBUG_INFO, "[touch_synaptics] PadAttached!\n");
 	}
 
-	printk("[touch_synaptics] rmi_f11_late_resume --\n");
+	rmi_debug(DEBUG_INFO, "[touch_synaptics] rmi_f11_late_resume --\n");
 
 }
 
@@ -888,9 +904,9 @@ static void rmi_f11_finger_handler(struct f11_2d_sensor *sensor)
 				(finger_state == F11_INACCURATE)) {
 			finger_pressed_count++;
 	//ASUS_BSP simpson: add for tracking fingers +++
-			if (finger_count[i]%REPORT_COUNT == 0) printk("[touch_synaptics] reporting finger%d[%d]=[%d,%d]\n", i, finger_count[i], X, Y);
+			if (finger_count[i]%REPORT_COUNT == 0) rmi_debug(DEBUG_VERBOSE, "[touch_synaptics] reporting finger%d[%d]=[%d,%d]\n", i, finger_count[i], X, Y);
 			if (i == 0 && g_resumeLog){
-				printk("[touch_synaptics] log finger%d[%d]=[%d,%d] (%d)\n", i, finger_count[i], X, Y, g_resumeLog);
+				rmi_debug(DEBUG_VERBOSE, "[touch_synaptics] log finger%d[%d]=[%d,%d] (%d)\n", i, finger_count[i], X, Y, g_resumeLog);
 				//ASUS_BSP simpson: add for ASUSEvtlog +++
 				ASUSEvtlog("[touch_synaptics] log finger%d[%d]=[%d,%d] (%d)\n", i, finger_count[i], X, Y, g_resumeLog);
 				//ASUS_BSP simpson: add for ASUSEvtlog ---
@@ -902,7 +918,7 @@ static void rmi_f11_finger_handler(struct f11_2d_sensor *sensor)
 						g_XY = 0;
 					}
 					if (g_resumeLog == 1 && g_XY) {
-						//printk("[touch_synaptics] ==========> locked finger%d[%d]=[%d,%d] (%d)\n", i, finger_count[i], X, Y, g_resumeLog);
+						rmi_debug(DEBUG_VERBOSE, "[touch_synaptics] ==========> locked finger%d[%d]=[%d,%d] (%d)\n", i, finger_count[i], X, Y, g_resumeLog);
 						//ASUS_BSP simpson: add for ASUSEvtlog +++
 						ASUSEvtlog("[touch_synaptics] ==========> locked finger%d[%d]=[%d,%d] (%d)\n", i, finger_count[i], X, Y, g_resumeLog);
 						//ASUS_BSP simpson: add for ASUSEvtlog ---
@@ -912,9 +928,9 @@ static void rmi_f11_finger_handler(struct f11_2d_sensor *sensor)
 			}
 			finger_count[i]++;
 		} else {
-			if (finger_count[i] > 0) printk("[touch_synaptics] releasing finger%d[%d]=[%d,%d]\n", i, finger_count[i], X, Y);
+			if (finger_count[i] > 0) rmi_debug(DEBUG_VERBOSE, "[touch_synaptics] releasing finger%d[%d]=[%d,%d]\n", i, finger_count[i], X, Y);
 			if (i==0 && g_resumeLog) {
-				//printk("[touch_synaptics] log finger%d[%d]=[%d,%d] (%d)-released!\n", i, finger_count[i], X, Y, g_resumeLog);
+				rmi_debug(DEBUG_VERBOSE, "[touch_synaptics] log finger%d[%d]=[%d,%d] (%d)-released!\n", i, finger_count[i], X, Y, g_resumeLog);
 				//ASUS_BSP simpson: add for ASUSEvtlog +++
 				ASUSEvtlog("[touch_synaptics] log finger%d[%d]=[%d,%d] (%d)-released!\n", i, finger_count[i], X, Y, g_resumeLog);
 				//ASUS_BSP simpson: add for ASUSEvtlog ---
@@ -931,7 +947,7 @@ static void rmi_f11_finger_handler(struct f11_2d_sensor *sensor)
 			    }
 				rmi_led_trigger_event(keypad_led_trigger, finger_moving_led_level);
 				led_state = 1;
-				//printk("[touch_synaptics] finger down!!\n");
+				rmi_debug(DEBUG_VERBOSE, "[touch_synaptics] finger down!!\n");
 			} else if ((finger_pressed_count == 0) && (led_state ==1)) {
 			    if(delayed_work_pending(&keypad_off_work)) {
 			        cancel_delayed_work_sync(&keypad_off_work);
@@ -942,7 +958,7 @@ static void rmi_f11_finger_handler(struct f11_2d_sensor *sensor)
 				} else
 				queue_delayed_work(keypad_bl_workqueue, &keypad_off_work, msecs_to_jiffies(user_duration));
 				led_state = 0;
-				//printk("[touch_synaptics] finger up!!\n");
+				rmi_debug(DEBUG_VERBOSE, "[touch_synaptics] finger up!!\n");
 			}
 		}
 //ASUS_BSP simpson: add for finger moving trigger ---
@@ -1721,6 +1737,9 @@ INIT_DELAYED_WORK(&keypad_off_work, turnoff_keypad_bl);
 //	rmi_led_trigger_event(keypad_led_trigger, key_pressed_led_level);
 //	queue_delayed_work(keypad_bl_workqueue, &keypad_off_work, msecs_to_jiffies(user_duration));
 //ASUS_BSP simpson: add for keypad_bl ---
+
+    pwmb = pwm_get(5); //ASUS_BSP HANS: add for PWM ++
+
 //ASUS_BSP simpson: add for suspend/resume +++
 #ifdef CONFIG_HAS_EARLYSUSPEND
     register_early_suspend( &rmi_early_suspend_desc );
@@ -1884,7 +1903,7 @@ static int rmi_f11_resume(struct rmi_function_container *fc)
 	union f11_2d_commands commands = {};
 	int retval = 0;
 
-	printk("[touch_synaptics] rmi_f11_resumeRezero ++\n");
+	rmi_debug(DEBUG_INFO, "[touch_synaptics] rmi_f11_resumeRezero ++\n");
 	dev_dbg(&fc->dev, "Resuming...\n");
 	if (!data->rezero_on_resume)
 		return 0;
@@ -1901,7 +1920,7 @@ static int rmi_f11_resume(struct rmi_function_container *fc)
 		return retval;
 	}
 
-	printk("[touch_synaptics] rmi_f11_resumeRezero --\n");
+	rmi_debug(DEBUG_INFO, "[touch_synaptics] rmi_f11_resumeRezero --\n");
 	return retval;
 }
 #endif /* RESUME_REZERO */
@@ -2102,6 +2121,7 @@ static ssize_t screen_unlocked_store(struct device *dev,
 	if (sscanf(buf, "%d", &unlock1time) != 1)
 		return -EINVAL;
 	if (unlock1time == 1) {
+		rmi_debug(DEBUG_INFO, "[touch_synaptics] screen unlocked!\n");
 		if(delayed_work_pending(&keypad_off_work)) {
 			cancel_delayed_work_sync(&keypad_off_work);
 			queue_delayed_work(keypad_bl_workqueue, &keypad_off_work, msecs_to_jiffies(unlock_duration));

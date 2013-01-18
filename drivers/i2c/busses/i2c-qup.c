@@ -797,7 +797,7 @@ qup_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
 	int rem = num;
 	long timeout;
 	int err;
-
+	
 	del_timer_sync(&dev->pwr_timer);
 	mutex_lock(&dev->mlock);
 
@@ -1562,22 +1562,28 @@ static int qup_i2c_suspend(struct device *device)
 	struct platform_device *pdev = to_platform_device(device);
 	struct qup_i2c_dev *dev = platform_get_drvdata(pdev);
 
-        if(APQ_8064_GSBI1_QUP_I2C_BUS_ID==dev->adapter.nr){
-                          printk("pad i2c suspending..\r\n");
-                          AX_MicroP_Bus_Suspending(1);                            
-        }
 //ASUS_BSP+++ check MHL power state for determine i2c suspend
-	if (APQ_8064_GSBI4_QUP_I2C_BUS_ID == dev->adapter.nr) {
-		if (fwPowerState != POWER_STATE_D3)
-		{
-	            printk("[i2c suspend] mhl8240 not in low power mode,  skip i2c suspending\r\n");	
-			ASUSEvtlog("[i2c suspend] not in low power mode,  skip i2c suspending\n");				
-			return -EBUSY;
-		}
-	}
+    if (APQ_8064_GSBI4_QUP_I2C_BUS_ID == dev->adapter.nr) {
+        if (fwPowerState != POWER_STATE_D3)
+        {
+                printk("[i2c suspend] mhl8240 not in low power mode,  skip i2c suspending\r\n");    
+            ASUSEvtlog("[i2c suspend] not in low power mode,  skip i2c suspending\n");                
+            return -EBUSY;
+        }
+        else
+        {
+                 printk("GSBI4 i2c suspending.., MHL state(%d)\r\n", fwPowerState);                
+        }    
+    }
 //ASUS_BSP--- check MHL power state for determine i2c suspend
+
 	/* Grab mutex to ensure ongoing transaction is over */
-	mutex_lock(&dev->mlock);
+	if (mutex_trylock(&dev->mlock) == 0)
+	{
+		printk("%s: mutex lock...\r\n",__FUNCTION__);
+		return -EBUSY;
+	}
+	//mutex_lock(&dev->mlock);
 	dev->suspended = 1;
 	if (dev->adapter.nr <= APQ_8064_GSBI5_QUP_I2C_BUS_ID)
 		qup_bus_suspended[dev->adapter.nr] = dev->suspended;
@@ -1589,6 +1595,10 @@ static int qup_i2c_suspend(struct device *device)
 	clk_unprepare(dev->clk);
 	clk_unprepare(dev->pclk);
 	qup_i2c_free_gpios(dev);
+    if(APQ_8064_GSBI1_QUP_I2C_BUS_ID==dev->adapter.nr){
+        printk("pad i2c suspending..\r\n");
+        AX_MicroP_Bus_Suspending(1);                            
+    }	
 	return 0;
 }
 

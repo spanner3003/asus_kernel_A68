@@ -173,6 +173,11 @@ static int j_cnt = 0;
 static void mdp4_dtv_blt_ov_update(struct mdp4_overlay_pipe *pipe);
 static void mdp4_dtv_wait4dmae(int cndx);
 
+//Mickey+++
+extern int debug_iommu_commit_index;
+extern int debug_iommu_fbnum;
+//Mickey---
+
 int mdp4_dtv_pipe_commit(int cndx, int wait)
 {
 
@@ -184,6 +189,7 @@ int mdp4_dtv_pipe_commit(int cndx, int wait)
 	struct mdp4_overlay_pipe *real_pipe;
 	unsigned long flags;
 	int cnt = 0;
+    bool isYuvPresent = false;//Mickey+++
     int counter = (1000/dtv_frame_rate)+1;//Mickey+++
 
     vctrl = &vsync_ctrl_db[cndx];
@@ -225,7 +231,10 @@ int mdp4_dtv_pipe_commit(int cndx, int wait)
 		mutex_unlock(&vctrl->update_lock);
 		return 0;
 	}
-
+    //Mickey+++
+    debug_iommu_commit_index = 3;
+    debug_iommu_fbnum = 1;
+    //Mickey---
 	vctrl->update_ndx++;
 	vctrl->update_ndx &= 0x01;
 	vp->update_cnt = 0;	/* reset */
@@ -239,6 +248,11 @@ int mdp4_dtv_pipe_commit(int cndx, int wait)
 			if (real_pipe && real_pipe->pipe_used) {
 				/* pipe not unset */
 				mdp4_overlay_vsync_commit(pipe);
+                //Mickey+++, check if yuv layer presented
+                if (mdp4_overlay_format2type(real_pipe->src_format) == OVERLAY_TYPE_VIDEO) {
+                    isYuvPresent = true;
+                }
+                //Mickey---
 			}
 			/* free previous iommu to freelist
 			* which will be freed at next
@@ -272,8 +286,11 @@ int mdp4_dtv_pipe_commit(int cndx, int wait)
 	spin_unlock_irqrestore(&vctrl->spin_lock, flags);
 	mdp4_stat.overlay_commit[pipe->mixer_num]++;
 
-    //if (wait)
-    //    mdp4_dtv_wait4dmae(cndx);
+    //Mickey+++, wait only yuv layer presented
+    if (wait && isYuvPresent) {
+        mdp4_dtv_wait4dmae(cndx);
+    }
+    //Mickey---
 
 	return cnt;
 }
@@ -607,7 +624,7 @@ int mdp4_dtv_on(struct platform_device *pdev)
 	vctrl->dev = mfd->fbi->dev;
 	vctrl->fake_vsync = 1;
 
-	mdp_footswitch_ctrl(TRUE);
+	//mdp_footswitch_ctrl(TRUE);    //ASUS_BSP:Louis
 	/* Mdp clock enable */
 	mdp_clk_ctrl(1);
 
@@ -677,7 +694,7 @@ int mdp4_dtv_off(struct platform_device *pdev)
 	mdp4_overlay_panel_mode_unset(MDP4_MIXER1, MDP4_PANEL_DTV);
 
 	ret = panel_next_off(pdev);
-	mdp_footswitch_ctrl(FALSE);
+	//mdp_footswitch_ctrl(FALSE);   //ASUS_BSP:Louis
 	vctrl->fake_vsync = 1;
 
 	/* Mdp clock disable */

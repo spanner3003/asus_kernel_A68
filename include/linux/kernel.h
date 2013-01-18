@@ -36,7 +36,8 @@ enum DEVICE_HWID
 	A68_PR = 0x7,
 	A68_PR2 = 0x8,
 	A68_MP = 0x9,
-
+	A68_CD = 0xa,
+	
 	A80_EVB = 0x10,
 	A80_SR1 = 0x11,
 	A80_SR2 = 0x12,

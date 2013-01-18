@@ -255,6 +255,11 @@ void mdp4_dsi_cmd_pipe_queue(int cndx, struct mdp4_overlay_pipe *pipe)
 
 static void mdp4_dsi_cmd_blt_ov_update(struct mdp4_overlay_pipe *pipe);
 
+//Mickey+++
+extern int debug_iommu_commit_index;
+extern int debug_iommu_fbnum;
+//Mickey---
+
 int mdp4_dsi_cmd_pipe_commit(int cndx, int wait)
 {
 	int  i, undx;
@@ -280,7 +285,10 @@ int mdp4_dsi_cmd_pipe_commit(int cndx, int wait)
 		mutex_unlock(&vctrl->update_lock);
 		return cnt;
 	}
-
+    //Mickey+++
+    debug_iommu_commit_index = 2;
+    debug_iommu_fbnum = 0;
+    //Mickey---
 	vctrl->update_ndx++;
 	vctrl->update_ndx &= 0x01;
 	vp->update_cnt = 0;     /* reset */

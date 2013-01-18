@@ -219,7 +219,9 @@ static ssize_t read_gdir(struct device *dev, struct device_attribute *devattr, c
         case A68_ER2:
         case A68_ER3:
         case A68_PR:
-	  case A68_MP:
+        case A68_MP:
+        case A68_PR2:
+        case A68_CD:
             gdir = 2;
             break;
         case A68_UNKNOWN:
@@ -249,7 +251,9 @@ static ssize_t read_mdir(struct device *dev, struct device_attribute *devattr, c
         case A68_ER2:
         case A68_ER3:
         case A68_PR:
-	  case A68_MP:
+        case A68_MP:
+        case A68_PR2:
+        case A68_CD:
             mdir = 30;
             break;
         case A68_UNKNOWN:

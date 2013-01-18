@@ -212,7 +212,7 @@ static struct pm8xxx_misc_platform_data apq8064_pm8921_misc_pdata = {
 	.priority		= 0,
 };
 
-#define PM8921_LC_LED_MAX_CURRENT	4	/* I = 4mA */
+#define PM8921_LC_LED_MAX_CURRENT	40	//ASUS_BSP HANS: modify for PWM++
 #define PM8921_LC_LED_LOW_CURRENT	1	/* I = 1mA */
 #define PM8XXX_LED_PWM_PERIOD		1000
 #define PM8XXX_LED_PWM_DUTY_MS		20
@@ -234,7 +234,7 @@ static struct led_platform_data pm8921_led_core_pdata = {
 	.leds = pm8921_led_info,
 };
 //ASUS_BSP simpson: add for keypad_bl +++
-#if 0
+#if 1
 static int pm8921_led0_pwm_duty_pcts[56] = {
 	1, 4, 8, 12, 16, 20, 24, 28, 32, 36,
 	40, 44, 46, 52, 56, 60, 64, 68, 72, 76,
@@ -256,13 +256,28 @@ static struct pm8xxx_pwm_duty_cycles pm8921_led0_pwm_duty_cycles = {
 	.start_idx = 1,
 };
 #endif
+
 static struct pm8xxx_led_config pm8921_led_configs[] = {
+/* ASUS_BSP HANS: modify for PWM
 	[0] = {
 		.id = PM8XXX_ID_LED_0,
 		.mode = PM8XXX_LED_MODE_MANUAL,
 		.max_current = 40,
 		.pwm_channel = PM8XXX_PWM_CHANNEL_NONE,
 	},
+*/
+
+//ASUS_BSP HANS: add for PWM +++
+    [0] = {
+		.id = PM8XXX_ID_LED_0,
+		.mode = PM8XXX_LED_MODE_PWM2,
+		.max_current = PM8921_LC_LED_MAX_CURRENT,
+		.pwm_channel = 5,
+		.pwm_period_us = 100,
+		.pwm_duty_cycles = &pm8921_led0_pwm_duty_cycles,
+	},
+//ASUS_BSP HANS: add for PWM ---
+
 };
 //ASUS_BSP simpson: add for keypad_bl ---
 static struct pm8xxx_led_platform_data apq8064_pm8921_leds_pdata = {

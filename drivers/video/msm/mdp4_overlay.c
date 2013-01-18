@@ -121,6 +121,10 @@ struct mdp4_overlay_perf perf_current = {
 
 static struct ion_client *display_iclient;
 
+//Mickey+++
+extern int debug_iommu_commit_index;
+extern int debug_iommu_fbnum;
+//Mickey---
 
 /*
  * mdp4_overlay_iommu_unmap_freelist()
@@ -713,8 +717,14 @@ void mdp4_overlay_rgb_setup(struct mdp4_overlay_pipe *pipe)
 		op_mode &= ~(MDP4_OP_FLIP_LR + MDP4_OP_SCALEX_EN);
 		op_mode &= ~(MDP4_OP_FLIP_UD + MDP4_OP_SCALEY_EN);
 		outpdw(rgb_base + 0x0058, op_mode);/* MDP_RGB_OP_MODE */
-	} else
+	} else {
+		if (pipe->op_mode & MDP4_OP_FLIP_LR && mdp_rev >= MDP_REV_42) {
+			/* Enable x-scaling bit to enable LR flip */
+			/* for MDP > 4.2 targets */
+			pipe->op_mode |= 0x01;
+		}
 		outpdw(rgb_base + 0x0058, pipe->op_mode);/* MDP_RGB_OP_MODE */
+	}
 	outpdw(rgb_base + 0x005c, pipe->phasex_step);
 	outpdw(rgb_base + 0x0060, pipe->phasey_step);
 
@@ -2616,6 +2626,15 @@ static int mdp4_calc_pipe_mdp_clk(struct msm_fb_data_type *mfd,
 
 	pipe->req_clk = (u32) rst;
 
+    //Mickey+++, we don't use ov blt for camera 1080p recording
+    if (pipe->req_clk > mdp_max_clk) {
+        if (pipe->mixer_num == 0
+                && pipe->src_w == 1088 && pipe->src_h == 1920
+                && pipe->dst_w == 720 && pipe->dst_h >=1270) {
+            pipe->req_clk = mdp_max_clk;
+        }
+    }
+    //Mickey---
 //++ ASUS_BSP: 1080P require max mdp clk
     if (g_A68_hwID >= A80_EVB)
         pipe->req_clk = mdp_max_clk;
@@ -3346,6 +3365,11 @@ int mdp4_overlay_play(struct fb_info *info, struct msmfb_overlay_data *req)
 		return 0;
 	}
 
+    //Mickey+++
+    debug_iommu_commit_index = 1;
+    debug_iommu_fbnum = info->node;
+    //Mickey---
+
 	mutex_lock(&mfd->dma->ov_mutex);
 
 	img = &req->data;
@@ -3528,6 +3552,7 @@ end:
 	return ret;
 }
 
+extern int g_hdmi_status;//Mickey+++
 int mdp4_overlay_commit(struct fb_info *info, int mixer)
 {
     struct msm_fb_data_type *mfd = (struct msm_fb_data_type *)info->par;
@@ -3557,7 +3582,7 @@ int mdp4_overlay_commit(struct fb_info *info, int mixer)
             mdp4_lcdc_pipe_commit(0, 1);
         }
     } else if (mixer == MDP4_MIXER1) {
-        if (ctrl->panel_mode & MDP4_PANEL_DTV)
+        if ((ctrl->panel_mode & MDP4_PANEL_DTV) && (g_hdmi_status==1))//Mickey+++
             mdp4_dtv_pipe_commit(0, 1);
     }
 

@@ -358,6 +358,10 @@ static int MhlI2c_suspend(struct i2c_client *client, pm_message_t mesg)
 		disable_irq(gMhlDevice.pI2cClient->irq);
 	}
 #endif	
+
+//ASUS_BSP+++: mhl disable irq while mhl_suspend	
+	MHL_disable_irq();
+//ASUS_BSP---: mhl disable irq while mhl_suspend
 	g_mhl_suspend_flag = 1;
 
 	printk("[MHL] MhlI2c_suspend---\n");	
@@ -392,6 +396,10 @@ static int MhlI2c_resume(struct i2c_client *client)
 //		enable_irq(gMhlDevice.pI2cClient->irq);
 //	}
 #endif	
+//ASUS_BSP+++: mhl enable irq while mhl_resume	
+	MHL_enable_irq();
+//ASUS_BSP---: mhl enable irq while mhl_resume
+
 	g_mhl_suspend_flag = 0;
 	   
 	printk("[MHL] MhlI2c_resume ----\n");

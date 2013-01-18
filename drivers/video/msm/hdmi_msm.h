@@ -15,6 +15,7 @@
 
 #include <mach/msm_iomap.h>
 #include "external_common.h"
+#include <linux/wakelock.h>//Mickey+++
 /* #define PORT_DEBUG */
 
 #ifdef PORT_DEBUG
@@ -123,6 +124,8 @@ struct hdmi_msm_state_type {
 
 	struct external_common_state_type common;
 	boolean is_mhl_enabled;
+
+    struct wake_lock hpd_wake_lock; //Mickey+++
 };
 
 extern struct hdmi_msm_state_type *hdmi_msm_state;

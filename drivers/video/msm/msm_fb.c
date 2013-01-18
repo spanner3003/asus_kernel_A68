@@ -1821,10 +1821,6 @@ static int msm_fb_pan_display(struct fb_var_screeninfo *var,
 	struct mdp_dirty_region *dirtyPtr = NULL;
 	struct msm_fb_data_type *mfd = (struct msm_fb_data_type *)info->par;
 	struct msm_fb_panel_data *pdata;
-    //Mickey+++, skip internal panel pan in pad mode
-    if (info->node == 0 && mfd->asus_panel_disable) 
-        return 0; 
-    //Mickey---
     //Louis +++ skip, when we draw screen
     if (update_screen_flag == true)
         return 0;
@@ -1889,6 +1885,13 @@ static int msm_fb_pan_display(struct fb_var_screeninfo *var,
 
 		dirtyPtr = &dirty;
 	}
+    //Mickey+++, skip internal panel pan in pad mode
+    down(&msm_fb_suspend_sem);
+    if (info->node == 0 && mfd->asus_panel_disable) {
+        up(&msm_fb_suspend_sem);
+        return 0;
+    }
+    //Mickey---
 	complete(&mfd->msmfb_update_notify);
 	mutex_lock(&msm_fb_notify_update_sem);
 	if (mfd->msmfb_no_update_notify_timer.function)
@@ -1904,6 +1907,7 @@ static int msm_fb_pan_display(struct fb_var_screeninfo *var,
 		mdp_set_dma_pan_info(info, NULL, TRUE);
 		if (msm_fb_blank_sub(FB_BLANK_UNBLANK, info, mfd->op_enable)) {
 			pr_err("%s: can't turn on display!\n", __func__);
+            up(&msm_fb_suspend_sem);//Mickey+++
 			return -EINVAL;
 		}
 	}
@@ -1912,7 +1916,7 @@ static int msm_fb_pan_display(struct fb_var_screeninfo *var,
 			     (var->activate == FB_ACTIVATE_VBL));
 	mdp_dma_pan_update(info);
 	up(&msm_fb_pan_sem);
-
+    up(&msm_fb_suspend_sem);//Mickey+++
 	if (unset_bl_level && !bl_updated) {
 		pdata = (struct msm_fb_panel_data *)mfd->pdev->
 			dev.platform_data;
@@ -3050,14 +3054,19 @@ static int msmfb_overlay_set(struct fb_info *info, void __user *p)
 	int ret;
     //Mickey+++, do nothing when we are in pad mode
     struct msm_fb_data_type *mfd = (struct msm_fb_data_type *)info->par;
-
-    if (info->node == 0 && mfd->asus_panel_disable)
+    down(&msm_fb_suspend_sem);
+    if (info->node == 0 && mfd->asus_panel_disable) {
+        up(&msm_fb_suspend_sem);
         return -1;
-    //Mickey---
-	if (copy_from_user(&req, p, sizeof(req)))
+    }
+    if (copy_from_user(&req, p, sizeof(req))) {
+        up(&msm_fb_suspend_sem);
 		return -EFAULT;
+    }
 
 	ret = mdp4_overlay_set(info, &req);
+    up(&msm_fb_suspend_sem);
+    //Mickey---
 	if (ret) {
 		printk(KERN_ERR "%s: ioctl failed, rc=%d\n",
 			__func__, ret);
@@ -3143,10 +3152,6 @@ static int msmfb_overlay_play(struct fb_info *info, unsigned long *argp)
 	struct msm_fb_data_type *mfd = (struct msm_fb_data_type *)info->par;
 	struct msm_fb_panel_data *pdata;
 
-    //Mickey+++, do nothing when we are in pad mode
-    if (info->node == 0 && mfd->asus_panel_disable)
-        return -1;
-    //Mickey---
 	if (mfd->overlay_play_enable == 0)	/* nothing to do */
 		return 0;
 
@@ -3156,7 +3161,13 @@ static int msmfb_overlay_play(struct fb_info *info, unsigned long *argp)
 			__func__);
 		return ret;
 	}
-
+    //Mickey+++, do nothing when we are in pad mode
+    down(&msm_fb_suspend_sem);
+    if (info->node == 0 && mfd->asus_panel_disable) {
+        up(&msm_fb_suspend_sem);
+        return -1;
+    }
+    //Mickey---
 	complete(&mfd->msmfb_update_notify);
 	mutex_lock(&msm_fb_notify_update_sem);
 	if (mfd->msmfb_no_update_notify_timer.function)
@@ -3170,12 +3181,13 @@ static int msmfb_overlay_play(struct fb_info *info, unsigned long *argp)
 		mdp_set_dma_pan_info(info, NULL, TRUE);
 		if (msm_fb_blank_sub(FB_BLANK_UNBLANK, info, mfd->op_enable)) {
 			pr_err("%s: can't turn on display!\n", __func__);
+            up(&msm_fb_suspend_sem);//Mickey+++
 			return -EINVAL;
 		}
 	}
 
 	ret = mdp4_overlay_play(info, &req);
-
+    up(&msm_fb_suspend_sem);//Mickey+++
 	if (unset_bl_level && !bl_updated) {
 		pdata = (struct msm_fb_panel_data *)mfd->pdev->
 			dev.platform_data;

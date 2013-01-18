@@ -320,7 +320,7 @@ static int __devinit rmi_i2c_probe(struct i2c_client *client,
 	data->enabled = true;	/* We plan to come up enabled. */
 	data->irq = gpio_to_irq(pdata->attn_gpio);
 	if (pdata->level_triggered) {
-	printk("[touch_synaptics] level_triggered true\n");	//ASUS_BSP simpson: add for improve IRQ stability ++
+	rmi_debug(DEBUG_INFO, "[touch_synaptics] level_triggered true\n");	//ASUS_BSP simpson: add for improve IRQ stability ++
 		data->irq_flags = IRQF_ONESHOT |
 			((pdata->attn_polarity == RMI_ATTN_ACTIVE_HIGH) ?
 			IRQF_TRIGGER_HIGH : IRQF_TRIGGER_LOW);
@@ -405,11 +405,11 @@ static int __devinit rmi_i2c_probe(struct i2c_client *client,
 #endif /* CONFIG_RMI4_DEV */
 //ASUS_BSP simpson: add for I2C_STRESS_TEST +++
 #ifdef CONFIG_I2C_STRESS_TEST
-	printk("[touch_synaptics] SynaTouch add test case+\n");
+	rmi_debug(DEBUG_INFO, "[touch_synaptics] SynaTouch add test case+\n");
 
 	i2c_add_test_case(client, "SynaTouch",ARRAY_AND_SIZE(gTouchTestCaseInfo));
 
-	printk("[touch_synaptics] SynaTouch add test case-\n");
+	rmi_debug(DEBUG_INFO, "[touch_synaptics] SynaTouch add test case-\n");
 #endif
 //ASUS_BSP simpson: add for I2C_STRESS_TEST ---
 

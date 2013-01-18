@@ -5,6 +5,8 @@ struct pwm_device;
 
 /* Add __weak functions to support PWM */
 
+struct pwm_device __weak *pwm_get(int pwm_id); //ASUS_BSP HANS++
+
 /*
  * pwm_request - request a PWM device
  */

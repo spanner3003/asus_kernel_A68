@@ -3286,7 +3286,7 @@ static void P02_reportPropertyCapacity(struct AXC_BatteryService *_this, int P02
 
     bool P02_hasCable;
     int  P02_chgStatus=0;//ASUS_BSP Eason_Chang 1120 porting
-
+    int16_t  Pad_avgCurrent=0;
     time_t P02_intervalSinceLastUpdate;
 
     mutex_lock(&_this->filter_lock);
@@ -3334,24 +3334,29 @@ static void P02_reportPropertyCapacity(struct AXC_BatteryService *_this, int P02
                                       P02_maxMah,
                                       P02_intervalSinceLastUpdate);
 
-    pr_debug("[BAT][Ser][P02]report Capacity:%d,%d,%d,%d,%d,%d,%d,%ld==>%d\n",
+
+    Pad_avgCurrent=AX_MicroP_readGaugeAvgCurrent();
+    
+    pr_debug("[BAT][Ser][P02]report Capacity:%d,%d,%d,%d,%d,%d,%d,%d,%ld==>%d\n",
                                     P02_refcapacity,
                                     lastCapacity,
                                       P02_hasCable,
                                       _this->P02_IsCharging,
                                       _this->P02_IsFULL,
                                       _this->P02_IsBatLow,
+                                      Pad_avgCurrent,
                                       P02_maxMah,
                                       P02_intervalSinceLastUpdate,
                                       Pad_capacity);
     //ASUS_BSP Eason_Chang add event log +++
-    ASUSEvtlog("[BAT][Ser][P02]report Capacity:%d,%d,%d,%d,%d,%d,%d,%ld==>%d\n",
+    ASUSEvtlog("[BAT][Ser][P02]report Capacity:%d,%d,%d,%d,%d,%d,%d,%d,%ld==>%d\n",
                                     P02_refcapacity,
                                     lastCapacity,
                                       P02_hasCable,
                                       _this->P02_IsCharging,
                                       _this->P02_IsFULL,
                                       _this->P02_IsBatLow,
+                                      Pad_avgCurrent,
                                       P02_maxMah,
                                       P02_intervalSinceLastUpdate,
                                       Pad_capacity);

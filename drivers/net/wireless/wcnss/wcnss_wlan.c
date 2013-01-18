@@ -38,12 +38,14 @@ static char *wcnss_1 = NULL;
 static char *wcnss_2 = NULL;
 static char *wcnss_4 = NULL;
 static char *wcnss_5 = NULL;
+static char *wcnss_6 = NULL;
 static char *wcnss_m = NULL;
 module_param(wcnss_0, charp, S_IRUGO | S_IWUSR);
 module_param(wcnss_1, charp, S_IRUGO | S_IWUSR);
 module_param(wcnss_2, charp, S_IRUGO | S_IWUSR);
 module_param(wcnss_4, charp, S_IRUGO | S_IWUSR);
 module_param(wcnss_5, charp, S_IRUGO | S_IWUSR);
+module_param(wcnss_6, charp, S_IRUGO | S_IWUSR);
 module_param(wcnss_m, charp, S_IRUGO | S_IWUSR);
 
 /* module params */
@@ -549,8 +551,9 @@ static int __init wcnss_wlan_init(void)
     wcnss_2 = (char *) kmalloc(32, GFP_KERNEL);
     wcnss_4 = (char *) kmalloc(32, GFP_KERNEL);
     wcnss_5 = (char *) kmalloc(32, GFP_KERNEL);
+    wcnss_6 = (char *) kmalloc(32, GFP_KERNEL);
     wcnss_m = (char *) kmalloc(32, GFP_KERNEL);
-    if( (wcnss_0 == NULL) || (wcnss_1 == NULL) || (wcnss_2 == NULL) || (wcnss_4 == NULL) || (wcnss_5 == NULL) || (wcnss_m == NULL) ) {
+    if( (wcnss_0 == NULL) || (wcnss_1 == NULL) || (wcnss_2 == NULL) || (wcnss_4 == NULL) || (wcnss_5 == NULL) || (wcnss_6 == NULL) || (wcnss_m == NULL) ) {
         pr_info("[wcnss]: malloc(32) fail.\n");
     }
     memset( wcnss_0, 0, 32 );
@@ -558,6 +561,7 @@ static int __init wcnss_wlan_init(void)
     memset( wcnss_2, 0, 32 );
     memset( wcnss_4, 0, 32 );
     memset( wcnss_5, 0, 32 );
+    memset( wcnss_6, 0, 32 );
     memset( wcnss_m, 0, 32 );
 
     pr_info("[wcnss]: g_A68_cpuID=%d.\n", g_A68_cpuID);
@@ -568,6 +572,7 @@ static int __init wcnss_wlan_init(void)
         sprintf((char *)(wcnss_2), "wcnss_%d.b02", g_A68_cpuID);
         sprintf((char *)(wcnss_4), "wcnss_%d.b04", g_A68_cpuID);
         sprintf((char *)(wcnss_5), "wcnss_%d.b05", g_A68_cpuID);
+        sprintf((char *)(wcnss_6), "wcnss_%d.b06", g_A68_cpuID);
         sprintf((char *)(wcnss_m), "wcnss_%d.mdt", g_A68_cpuID);
     }
     else {
@@ -576,10 +581,11 @@ static int __init wcnss_wlan_init(void)
         sprintf((char *)(wcnss_2), "wcnss_719.b02");
         sprintf((char *)(wcnss_4), "wcnss_719.b04");
         sprintf((char *)(wcnss_5), "wcnss_719.b05");
+        sprintf((char *)(wcnss_6), "wcnss_719.b06");
         sprintf((char *)(wcnss_m), "wcnss_719.mdt");
     }
 
-    pr_info("[wcnss]: %s, %s, %s, %s, %s, %s.\n", wcnss_0, wcnss_1, wcnss_2, wcnss_4, wcnss_5, wcnss_m);
+    pr_info("[wcnss]: %s, %s, %s, %s, %s, %s, %s.\n", wcnss_0, wcnss_1, wcnss_2, wcnss_4, wcnss_5, wcnss_6, wcnss_m);
 
 	return 0;
 }

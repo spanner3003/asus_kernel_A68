@@ -177,7 +177,7 @@ static int pad_tv_mode_set(const char *val, struct kernel_param *kp)
 		pad_tv_mode = old_val;
 		return -EINVAL;
 	}
-
+/*
 	printk("+++gMHL_USB_ID_DETECT config = 0x%x\n",  __raw_readl(GPIO_CONFIG_DBG(MHL_USB_ID_DETECT)) );
 	printk("+++GPIO_IN_OUT_DBG config = 0x%x\n",  __raw_readl(GPIO_IN_OUT_DBG(MHL_USB_ID_DETECT)) );
 
@@ -189,7 +189,7 @@ static int pad_tv_mode_set(const char *val, struct kernel_param *kp)
 	printk("----gMHL_USB_ID_DETECT config = 0x%x\n",  __raw_readl(GPIO_CONFIG_DBG(MHL_USB_ID_DETECT)) );
 	printk("---GPIO_IN_OUT_DBG config = 0x%x\n",  __raw_readl(GPIO_IN_OUT_DBG(MHL_USB_ID_DETECT)) );
 	printk("----- MHL_USB_ID_DETECT= %d\n", gpio_get_value(MHL_USB_ID_DETECT));			
-	
+*/	
 	printk("MHL pad_tv_mode_set :0x%x\n", pad_tv_mode);
 
 	return 0;
@@ -1130,6 +1130,111 @@ MhlTxNotifyEventsStatus_e  AppNotifyMhlEvent(uint8_t eventCode, uint8_t eventPar
 //					input_sync(gDriverContext.input_dev_key);
 					printk("[MHL RCP] KEY_BACK up\n");
 					break;
+//ASUS BSP Wei_Lai +++ 
+				case 0x20:
+					input_report_key(gDriverContext.input_dev_key, KEY_NUMERIC_0, 1);
+					input_report_key(gDriverContext.input_dev_key, KEY_NUMERIC_0, 0);
+					input_sync(gDriverContext.input_dev_key);
+					printk("[MHL RCP] KEY_NUMERIC_0 down\n");
+					break;
+				case 0x21:
+					input_report_key(gDriverContext.input_dev_key, KEY_NUMERIC_1, 1);
+					input_report_key(gDriverContext.input_dev_key, KEY_NUMERIC_1, 0);
+					input_sync(gDriverContext.input_dev_key);
+					printk("[MHL RCP] KEY_NUMERIC_1 down\n");
+					break;
+				case 0x22:
+					input_report_key(gDriverContext.input_dev_key, KEY_NUMERIC_2, 1);
+					input_report_key(gDriverContext.input_dev_key, KEY_NUMERIC_2, 0);
+					input_sync(gDriverContext.input_dev_key);
+					printk("[MHL RCP] KEY_NUMERIC_2 down\n");
+					break;
+				case 0x23:
+					input_report_key(gDriverContext.input_dev_key, KEY_NUMERIC_3, 1);
+					input_report_key(gDriverContext.input_dev_key, KEY_NUMERIC_3, 0);
+					input_sync(gDriverContext.input_dev_key);
+					printk("[MHL RCP] KEY_NUMERIC_3 down\n");
+					break;
+				case 0x24:
+					input_report_key(gDriverContext.input_dev_key, KEY_NUMERIC_4, 1);
+					input_report_key(gDriverContext.input_dev_key, KEY_NUMERIC_4, 0);
+					input_sync(gDriverContext.input_dev_key);
+					printk("[MHL RCP] KEY_NUMERIC_4 down\n");
+					break;
+				case 0x25:
+					input_report_key(gDriverContext.input_dev_key, KEY_NUMERIC_5, 1);
+					input_report_key(gDriverContext.input_dev_key, KEY_NUMERIC_5, 0);
+					input_sync(gDriverContext.input_dev_key);
+					printk("[MHL RCP] KEY_NUMERIC_5 down\n");
+					break;
+				case 0x26:
+					input_report_key(gDriverContext.input_dev_key, KEY_NUMERIC_6, 1);
+					input_report_key(gDriverContext.input_dev_key, KEY_NUMERIC_6, 0);
+					input_sync(gDriverContext.input_dev_key);
+					printk("[MHL RCP] KEY_NUMERIC_6 down\n");
+					break;
+				case 0x27:
+					input_report_key(gDriverContext.input_dev_key, KEY_NUMERIC_7, 1);
+					input_report_key(gDriverContext.input_dev_key, KEY_NUMERIC_7, 0);
+					input_sync(gDriverContext.input_dev_key);
+					printk("[MHL RCP] KEY_NUMERIC_7 down\n");
+					break;
+				case 0x28:
+					input_report_key(gDriverContext.input_dev_key, KEY_NUMERIC_8, 1);
+					input_report_key(gDriverContext.input_dev_key, KEY_NUMERIC_8, 0);
+					input_sync(gDriverContext.input_dev_key);
+					printk("[MHL RCP] KEY_NUMERIC_8 down\n");
+					break;
+				case 0x29:
+					input_report_key(gDriverContext.input_dev_key, KEY_NUMERIC_9, 1);
+					input_report_key(gDriverContext.input_dev_key, KEY_NUMERIC_9, 0);
+					input_sync(gDriverContext.input_dev_key);
+					printk("[MHL RCP] KEY_NUMERIC_9 down\n");
+					break;
+				case 0x44:
+					input_report_key(gDriverContext.input_dev_key, KEY_PLAYPAUSE, 1);
+					input_report_key(gDriverContext.input_dev_key, KEY_PLAYPAUSE, 0);
+					input_sync(gDriverContext.input_dev_key);
+					printk("[MHL RCP] KEY_PLAY down\n");
+					break;
+				case 0x45:
+					input_report_key(gDriverContext.input_dev_key, KEY_STOP, 1);
+					input_report_key(gDriverContext.input_dev_key, KEY_STOP, 0);
+					input_sync(gDriverContext.input_dev_key);
+					printk("[MHL RCP] KEY_STOP down\n");
+					break;
+				case 0x46:
+					input_report_key(gDriverContext.input_dev_key, KEY_PAUSE, 1);
+					input_report_key(gDriverContext.input_dev_key, KEY_PAUSE, 0);
+					input_sync(gDriverContext.input_dev_key);
+					printk("[MHL RCP] KEY_PAUSE down\n");
+					break;
+				case 0x48:
+					input_report_key(gDriverContext.input_dev_key, KEY_REWIND, 1);
+					input_report_key(gDriverContext.input_dev_key, KEY_REWIND, 0);
+					input_sync(gDriverContext.input_dev_key);
+					printk("[MHL RCP] KEY_REWIND down\n");
+					break;
+				case 0x49:
+					input_report_key(gDriverContext.input_dev_key, KEY_FASTFORWARD, 1);
+					input_report_key(gDriverContext.input_dev_key, KEY_FASTFORWARD, 0);
+					input_sync(gDriverContext.input_dev_key);
+					printk("[MHL RCP] KEY_FASTFORWARD down\n");
+					break;
+				case 0x4B:
+					input_report_key(gDriverContext.input_dev_key, KEY_NEXTSONG, 1);
+					input_report_key(gDriverContext.input_dev_key, KEY_NEXTSONG, 0);
+					input_sync(gDriverContext.input_dev_key);
+					printk("[MHL RCP] KEY_NEXTSONG down\n");
+					break;
+				case 0x4C:
+					input_report_key(gDriverContext.input_dev_key, KEY_PREVIOUSSONG, 1);
+					input_report_key(gDriverContext.input_dev_key, KEY_PREVIOUSSONG, 0);
+					input_sync(gDriverContext.input_dev_key);
+					printk("[MHL RCP] KEY_PREVIOUSSONG down\n");
+					break;
+					
+//ASUS BSP Wei_Lai --- 
 				default:
 					printk("[MHL RCP] default key =0x%x\n", gDriverContext.keyCode);
 					
@@ -1567,6 +1672,28 @@ static int __init SiiMhlInit(void)
     set_bit(KEY_LEFT,gDriverContext.input_dev_key->keybit);
     set_bit(KEY_RIGHT,gDriverContext.input_dev_key->keybit);	
 //ASUS_BSP --- larry lai: support RCP LD_GUI Key
+//ASUS BSP Wei_Lai support RCP LD_VIDEO Key	+++
+  set_bit(KEY_NUMERIC_1,gDriverContext.input_dev_key->keybit);
+  set_bit(KEY_NUMERIC_2,gDriverContext.input_dev_key->keybit);
+  set_bit(KEY_NUMERIC_3,gDriverContext.input_dev_key->keybit);
+  set_bit(KEY_NUMERIC_4,gDriverContext.input_dev_key->keybit);
+  set_bit(KEY_NUMERIC_5,gDriverContext.input_dev_key->keybit);
+  set_bit(KEY_NUMERIC_6,gDriverContext.input_dev_key->keybit);
+  set_bit(KEY_NUMERIC_7,gDriverContext.input_dev_key->keybit);
+  set_bit(KEY_NUMERIC_8,gDriverContext.input_dev_key->keybit);
+  set_bit(KEY_NUMERIC_9,gDriverContext.input_dev_key->keybit);
+  set_bit(KEY_NUMERIC_0,gDriverContext.input_dev_key->keybit);
+  set_bit(KEY_CLEAR,gDriverContext.input_dev_key->keybit);
+ // set_bit(KEY_PLAY,gDriverContext.input_dev_key->keybit);
+  set_bit(KEY_PLAYPAUSE,gDriverContext.input_dev_key->keybit);
+  set_bit(KEY_STOP,gDriverContext.input_dev_key->keybit);
+  set_bit(KEY_PAUSE,gDriverContext.input_dev_key->keybit);
+  set_bit(KEY_REWIND,gDriverContext.input_dev_key->keybit);
+  set_bit(KEY_FASTFORWARD,gDriverContext.input_dev_key->keybit);
+  set_bit(KEY_NEXTSONG,gDriverContext.input_dev_key->keybit);
+  set_bit(KEY_PREVIOUSSONG,gDriverContext.input_dev_key->keybit);
+  
+//ASUS BSP Wei_Lai support RCP LD_VIDEO Key	---
 
     ret = input_register_device(gDriverContext.input_dev_key);
     if (ret < 0) {

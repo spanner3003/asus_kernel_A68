@@ -434,7 +434,7 @@ extern void resetdevice(void);
 #include <asm/cacheflush.h>
 #include <linux/asus_global.h>
 extern struct _asus_global asus_global;
-
+int volumedownkeystatus;
 static void gpio_keys_gpio_report_event(struct gpio_button_data *bdata)
 {
 	const struct gpio_keys_button *button = bdata->button;
@@ -442,6 +442,7 @@ static void gpio_keys_gpio_report_event(struct gpio_button_data *bdata)
 	unsigned int type = button->type ?: EV_KEY;
 	int state = (gpio_get_value_cansleep(button->gpio) ? 1 : 0) ^ button->active_low;
    	int volume_up_key, volume_down_key;
+   	int volume_down_key_status_change_from_press = 0;
 	volume_up_key = 53;
 	volume_down_key = 54;
 
@@ -454,9 +455,24 @@ static void gpio_keys_gpio_report_event(struct gpio_button_data *bdata)
 	else{
 		count_start = 0;
 	}
+	if (gpio_get_value_cansleep(volume_down_key) == 0)
+	{
+		if (volumedownkeystatus)
+		{
+			volumedownkeystatus = 0;
+		}
+	}
+	else
+	{
+		if (!volumedownkeystatus)
+		{
+			volumedownkeystatus = 1;
+			volume_down_key_status_change_from_press = 1;
+		}
+	}
 	if (count_start)
 	{
-		if (gpio_get_value_cansleep(volume_down_key) == 0)
+		if (volume_down_key_status_change_from_press)
 		{
 			count++;
 			if (count == 10)
@@ -1415,7 +1431,7 @@ static int __devinit gpio_keys_probe(struct platform_device *pdev)
 	struct input_dev *input;
 	int i, error;
 	int wakeup = 0;
-
+	int volume_down_key = 54;
     //jack for debug slow
     INIT_WORK(&__wait_for_two_keys_work, wait_for_two_keys_work);
 
@@ -1423,6 +1439,8 @@ static int __devinit gpio_keys_probe(struct platform_device *pdev)
         wake_lock_init(&pwr_key_wake_lock, WAKE_LOCK_SUSPEND, "pwr_key_lock");
         printk(KERN_INFO "[PM]Initialize a wakelock of PWR key\r\n");
 //Ledger --
+
+	volumedownkeystatus = gpio_get_value_cansleep(volume_down_key);//0>press 1>release
 
 	if (!pdata) {
 		error = gpio_keys_get_devtree_pdata(dev, &alt_pdata);

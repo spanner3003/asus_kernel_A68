@@ -787,7 +787,7 @@ static void hdmi_msm_hpd_off(void);
 
 //Mickey+++
 // Support ATD hdmi test
-static int g_hdmi_status = 0; //g_hdmi_status=1:connected ; 0:disconnected 
+int g_hdmi_status = 0; //g_hdmi_status=1:connected ; 0:disconnected
 
 static ssize_t read_hdmi_status(struct device *dev, struct device_attribute *devattr, char *buf)
 {
@@ -799,9 +799,16 @@ DEVICE_ATTR(hdmi_status, S_IRUGO, read_hdmi_status, NULL);
 // ASUS_BSP Jiunhau_Wang +++ support enable / disable HPD
 static int g_hpd_disable = 0;
 static int g_hpd_enable = 0;
+//ASUS_BSP: joe1_++: force turning on/off hdmi
+#define HDMI_FORCE 5
+static int g_hdmi_force_on = 0;
+//ASUS_BSP: joe1_--: force turning on/off hdmi
 
 int hdmi_msm_hpd_status(void);
-void hdmi_msm_HPD_control(int);
+//ASUS_BSP: joe1_++: force turning on/off hdmi
+//void hdmi_msm_HPD_control(int);
+void hdmi_msm_HPD_control(int, bool);
+//ASUS_BSP: joe1_--: force turning on/off hdmi
 
 int hdmi_msm_hpd_status(void)
 {
@@ -920,6 +927,10 @@ static void create_padswitch_proc_file(void)
 static ssize_t hpdswitch_proc_write(struct file *filp, const char *buff, size_t len, loff_t *off)
 {
     char messages[256];
+//ASUS_BSP: joe1_++: force turning on/off hdmi
+	int cfg[2];
+	bool bHdmiForce = false;
+//ASUS_BSP: joe1_--: force turning on/off hdmi
 
     memset(messages, 0, sizeof(messages));
 
@@ -928,25 +939,75 @@ static ssize_t hpdswitch_proc_write(struct file *filp, const char *buff, size_t 
     if (copy_from_user(messages, buff, len))
         return -EFAULT;
 
+//ASUS_BSP: joe1_++: force turning on/off hdmi
+	sscanf(buff, "%d%d\n",&cfg[0], &cfg[1]);
+	printk("[HDMI_FORCE] hpdswitch_proc_write: cfg[0]=%d, cfg[1]=%d\n", cfg[0], cfg[1]);
+
+	if ( cfg[1] == HDMI_FORCE )
+	{
+		bHdmiForce = true;
+	}
+//ASUS_BSP: joe1_--: force turning on/off hdmi
+
     initKernelEnv();
 
     if(strncmp(messages, "1", 1) == 0)
     {
-		if(hdmi_msm_hpd_status() == 1)
+//ASUS_BSP: joe1_++: force turning on/off hdmi
+		if ( bHdmiForce )
 		{
-			g_hpd_enable ++;
-			hdmi_msm_HPD_control(1);
-		    printk(KERN_INFO "[HPD] enable HPD\n");
+//			printk("[HDMI_FORCE] hpdswitch_proc_write: bHdmiForce=%d\n", bHdmiForce);
+
+//			if (!g_hdmi_force_on)
+//			{
+				g_hdmi_force_on = 1;
+				hdmi_msm_HPD_control(1, true);
+
+				printk("[HDMI_FORCE] hpdswitch_proc_write: bHdmiForce=%d; turn on.\n", bHdmiForce);
+//			}
 		}
+		else
+		{
+//ASUS_BSP: joe1_--: force turning on/off hdmi
+			if(hdmi_msm_hpd_status() == 1)
+			{
+				g_hpd_enable ++;
+//ASUS_BSP: joe1_++: force turning on/off hdmi
+//				hdmi_msm_HPD_control(1);
+				hdmi_msm_HPD_control(1, false);
+//ASUS_BSP: joe1_--: force turning on/off hdmi
+			    printk(KERN_INFO "[HPD] enable HPD\n");
+			}
+		}//ASUS_BSP: joe1_++: force turning on/off hdmi
     }
     else if(strncmp(messages, "0", 1) == 0)
 	{
-		if(hdmi_msm_hpd_status() == 0)
+//ASUS_BSP: joe1_++: force turning on/off hdmi
+		if ( bHdmiForce )
 		{
-			g_hpd_disable ++;
-			hdmi_msm_HPD_control(0);
-			printk(KERN_INFO "[HPD] disable HPD\n");
+//			printk("[HDMI_FORCE] hpdswitch_proc_write: bHdmiForce=%d\n", bHdmiForce);
+
+//			if (g_hdmi_force_on)
+//			{
+				hdmi_msm_HPD_control(0, true);
+				g_hdmi_force_on = 0;
+
+				printk("[HDMI_FORCE] hpdswitch_proc_write: bHdmiForce=%d; turn off.\n", bHdmiForce);
+//			}
 		}
+		else
+		{
+//ASUS_BSP: joe1_--: force turning on/off hdmi
+			if(hdmi_msm_hpd_status() == 0)
+			{
+				g_hpd_disable ++;
+//ASUS_BSP: joe1_++: force turning on/off hdmi
+//				hdmi_msm_HPD_control(0);
+				hdmi_msm_HPD_control(0, false);
+//ASUS_BSP: joe1_--: force turning on/off hdmi
+				printk(KERN_INFO "[HPD] disable HPD\n");
+			}
+		}//ASUS_BSP: joe1_++: force turning on/off hdmi
     }
 
     deinitKernelEnv();
@@ -1146,6 +1207,7 @@ static void hdmi_msm_hpd_state_work(struct work_struct *work)
 				KOBJ_CHANGE, envp);
 #endif
 		} else {
+            g_hdmi_status = 0;//Mickey++
 //Mickey+++
             if (g_p03State == ASUS_P03_LOW || g_p03State == ASUS_P03_HIGH)
             {
@@ -1174,7 +1236,8 @@ static void hdmi_msm_hpd_state_work(struct work_struct *work)
 			DEV_INFO("HDMI HPD: DISCONNECTED: send OFFLINE\n");
 			kobject_uevent(external_common_state->uevent_kobj,
 				KOBJ_OFFLINE);
-			g_hdmi_status = 0;//Mickey++
+
+			g_hdmi_force_on = 0;//ASUS_BSP: joe1_++: force turning on/off hdmi
 		}
 	}
 
@@ -1203,9 +1266,12 @@ static void hdmi_msm_hpd_state_work(struct work_struct *work)
 }
 
 // ASUS_BSP Jiunhau_Wang +++ support enable / disable HPD
-void hdmi_msm_HPD_control(int hpd_state)
+//ASUS_BSP: joe1_++: force turning on/off hdmi
+//void hdmi_msm_HPD_control(int hpd_state)
+void hdmi_msm_HPD_control(int hpd_state, bool bHdmiForce)
+//ASUS_BSP: joe1_--: force turning on/off hdmi
 {
-	char *envp[2];
+	char *envp[3]; //ASUS_BSP: joe1_++: force turning on/off hdmi
     int state = 0; //Rice
 	
 		if (hpd_state) {
@@ -1274,6 +1340,16 @@ void hdmi_msm_HPD_control(int hpd_state)
                     break;
             }
             envp[1] = NULL;
+//ASUS_BSP: joe1_++: force turning on/off hdmi
+			if (bHdmiForce)
+			{
+				envp[1] = "HDMI_FORCE=ON";
+				envp[2] = NULL;
+
+				DEV_INFO("[HDMI_FORCE] CONNECTED: send ONLINE\n");
+			}
+			else
+//ASUS_BSP: joe1_--: force turning on/off hdmi
 			DEV_INFO("HDMI HPD: CONNECTED: send ONLINE\n");
 			kobject_uevent_env(external_common_state->uevent_kobj,
 				KOBJ_ONLINE,envp);
@@ -1317,9 +1393,23 @@ void hdmi_msm_HPD_control(int hpd_state)
 			DEV_INFO("Hdmi state switched to %d: %s\n",
 				external_common_state->sdev.state,  __func__);
 
-			DEV_INFO("HDMI HPD: DISCONNECTED: send OFFLINE\n");
-			kobject_uevent(external_common_state->uevent_kobj,
-				KOBJ_OFFLINE);
+//ASUS_BSP: joe1_++: force turning on/off hdmi
+			if (bHdmiForce)
+			{
+				envp[0] = "HDMI_FORCE=OFF";
+				envp[1] = NULL;
+
+				DEV_INFO("[HDMI_FORCE] DISCONNECTED: send OFFLINE\n");
+				kobject_uevent_env(external_common_state->uevent_kobj, KOBJ_OFFLINE, envp);
+			}
+			else
+			{
+//ASUS_BSP: joe1_--: force turning on/off hdmi
+				DEV_INFO("HDMI HPD: DISCONNECTED: send OFFLINE\n");
+				kobject_uevent(external_common_state->uevent_kobj,
+					KOBJ_OFFLINE);
+			}//ASUS_BSP: joe1_++: force turning on/off hdmi
+
 			g_hdmi_status = 0;//Mickey++
 		}
 
@@ -1775,6 +1865,14 @@ void hdmi_msm_set_mode(boolean power_on)
 	if (power_on) {
 		/* ENABLE */
 		reg_val |= 0x00000001; /* Enable the block */
+
+//ASUS_BSP: joe1_++: force turning on/off hdmi
+		if (g_hdmi_force_on == 1)
+		{
+			external_common_state->hdmi_sink = TRUE;
+		}
+//ASUS_BSP: joe1_--: force turning on/off hdmi
+
 		if (external_common_state->hdmi_sink == 0) {
 			/* HDMI_DVI_SEL */
 			reg_val |= 0x00000002;
@@ -4890,7 +4988,10 @@ static int hdmi_msm_power_on(struct platform_device *pdev)
 
 	mutex_lock(&external_common_state_hpd_mutex);
 	hdmi_msm_state->panel_power_on = TRUE;
-	if (external_common_state->hpd_state && hdmi_msm_is_power_on()) {
+//ASUS_BSP: joe1_++: force turning on/off hdmi
+//	if (external_common_state->hpd_state && hdmi_msm_is_power_on()) {
+	if ( (external_common_state->hpd_state && hdmi_msm_is_power_on()) || (g_hdmi_force_on == 1) ) {
+//ASUS_BSP: joe1_--: force turning on/off hdmi
 		DEV_DBG("%s: Turning HDMI on\n", __func__);
 		mutex_unlock(&external_common_state_hpd_mutex);
 		hdmi_msm_turn_on();
@@ -5181,7 +5282,7 @@ static int __devinit hdmi_msm_probe(struct platform_device *pdev)
 // ASUS_BSP Jiunhau_Wang --- support enable / disable HPD
 #endif
 //Mickey---
-	
+    wake_lock_init(&hdmi_msm_state->hpd_wake_lock, WAKE_LOCK_SUSPEND, "hdp_wake");//Mickey+++
 	return 0;
 
 error:
@@ -5296,6 +5397,8 @@ static void hdmi_pad_state_work(struct work_struct *work)
     hdmi_msm_state->hpd_stable = 0;
     mod_timer(&hdmi_msm_state->hpd_state_timer, jiffies+msecs_to_jiffies(300));
     mutex_unlock(&hdmi_msm_state_mutex);
+    wake_lock_timeout(&hdmi_msm_state->hpd_wake_lock,5*HZ);
+    pr_info("HDMI: hdp_wake_lock, 5*HZ");
 }
 
 irqreturn_t pad_detect_isr(int irq, void *data)

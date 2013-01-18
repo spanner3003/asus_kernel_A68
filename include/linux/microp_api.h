@@ -177,6 +177,9 @@ int AX_MicroP_enablePinInterrupt(unsigned int pinID, int enable);
 int AX_MicroP_readBattCapacity(int target);
 
 
+int AX_MicroP_readGaugeAvgCurrent(void);
+
+
 /*
 *  @AX_IsPadUsing_MHL_H
 *  return: 1 for MHL_H

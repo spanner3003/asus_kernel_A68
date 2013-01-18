@@ -455,6 +455,32 @@ failed:
 }
 
 
+int AX_MicroP_readGaugeAvgCurrent(void){
+       int16_t avgCur=0;
+       int ret=0;
+
+
+       if(AX_MicroP_IsP01Connected()==0){
+            printk("%s: P01 removed\r\n",__FUNCTION__);
+            return 0;
+       }
+
+       if(isFirmwareUpdating()){
+            printk("%s: P01 is updating, retry later\r\n",__FUNCTION__);
+            return 0;
+       }
+       
+       ret=uP_nuvoton_read_reg(MICROP_GAUGE_AVG_CURRENT,&avgCur);
+       if(ret < 0){
+            printk("%s: i2c failed ret=%d\r\n", __FUNCTION__,  ret);
+            return 0;
+       }
+       pr_debug("%s: avg cur=%d\r\n", __FUNCTION__, avgCur);
+       
+       return avgCur;
+}
+
+EXPORT_SYMBOL_GPL(AX_MicroP_readGaugeAvgCurrent);
 
 int AX_IsPadUsing_MHL_H(void){
        int regval=0;

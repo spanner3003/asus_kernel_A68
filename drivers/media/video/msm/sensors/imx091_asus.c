@@ -37,6 +37,9 @@ extern char g_camera_status;	//ASUS_BSP Stimber "Add ATD proc interface"
 extern struct completion g_iCatch_comp;
 //ASUS_BSP --- LiJen "[A68][13M][NA][Others]Mini porting for 13M camera with ISP"
 
+extern bool g_isAFDone;
+extern unsigned char g_mi1040_power;
+
 DEFINE_MUTEX(imx091_mut);
 struct msm_sensor_ctrl_t imx091_s_ctrl; //ASUS_BSP LiJen "[A68][13M][NA][Others]Mini porting for 13M camera with ISP"
 
@@ -659,7 +662,12 @@ static int imx091_sensor_config(struct msm_sensor_ctrl_t *s_ctrl, void __user *a
 		(void *)argp,
 		sizeof(struct sensor_cfg_data)))
 		return -EFAULT;
-    
+
+       if(false == g_imx091_power){
+            pr_err("%s power is down now\n",__func__);
+            rc = -EFAULT;
+       }
+        
 	       mutex_lock(s_ctrl->msm_sensor_mutex);
         	pr_info("msm_sensor_config: cfgtype = %d\n",cdata.cfgtype);\
                 
@@ -1001,6 +1009,11 @@ int imx091_power_down(const struct msm_camera_sensor_info *data, bool ISPbootup)
         
 	pr_info("%s +++\n",__func__);
 
+       if(g_imx091_power == false){
+            pr_info("%s --- power has disabled\n", __func__);
+            return -1;
+       }
+       
        iCatch_release_sensor();
         
 	if(!data)
@@ -1148,6 +1161,7 @@ int imx091_power_down(const struct msm_camera_sensor_info *data, bool ISPbootup)
 		   break;
 	}
 
+       g_imx091_power = false;
 	pr_info("%s ---\n",__func__);
 	return 0;
 }
@@ -1273,6 +1287,11 @@ int imx091_power_up(const struct msm_camera_sensor_info *data, bool ISPbootup)
         
 	pr_info("%s +++\n",__func__);
 
+       if(g_imx091_power == true){
+            pr_info("%s --- power has enabled\n", __func__);
+            return -1;	            
+       }
+       
 	if(!data)
 	{
 		pr_err("data is NULL, return\n");
@@ -1507,7 +1526,8 @@ int imx091_power_up(const struct msm_camera_sensor_info *data, bool ISPbootup)
 			pr_debug("gpio GPIO5(%d)\n",gpio_get_value(5));
 			break;
 	}
-    
+
+       g_imx091_power = true;
 	pr_info("%s ---\n",__func__);
 	return 0;	
 }
@@ -1516,27 +1536,13 @@ int imx091_power_up(const struct msm_camera_sensor_info *data, bool ISPbootup)
 int32_t imx091_sensor_power_up(struct msm_sensor_ctrl_t *s_ctrl)
 {
     int32_t rc =0;
-    if(g_imx091_power == false){
-        // Condif imx091 GPIO
-        rc = imx091_power_up(s_ctrl->sensordata, false);
-        if(rc < 0){
-            pr_err("%s: config imx091 gpio failed\n", __func__);
-            goto fail;
-        }
-#if 0        
-        // Config common GPIO
-        rc = msm_sensor_power_up(s_ctrl);
-        if(rc < 0){
-            pr_err("%s: config common gpio failed\n", __func__);
-            goto fail;
-        }
-#endif         
-        g_imx091_power = true;
-    }else{
-        pr_info("%s: power has enabled\n", __func__);
-    }
     
-fail:    
+    // Condif imx091 GPIO
+    rc = imx091_power_up(s_ctrl->sensordata, false);
+    if(rc < 0){
+        pr_err("%s: config imx091 gpio failed\n", __func__);
+    }      
+    
     return rc;
 }
 
@@ -1544,16 +1550,17 @@ int32_t imx091_sensor_power_down(struct msm_sensor_ctrl_t *s_ctrl)
 {
     int32_t rc =0;
 
-    if(g_imx091_power == true){
-        // Disable common GPIO
-        //msm_sensor_power_down(s_ctrl);
-        // Disable imx091 GPIO
-        imx091_power_down(s_ctrl->sensordata, false);
-        msleep(100); // wait for regulator output stop
-    }else{
-        pr_info("%s: power has disabled\n", __func__);
-    }
-    g_imx091_power = false;
+    while(g_isAFDone==false){
+        mutex_unlock(imx091_s_ctrl.msm_sensor_mutex);
+        msleep(1);
+        pr_info("%s wait AF Done\n",__func__);
+        mutex_lock(imx091_s_ctrl.msm_sensor_mutex);
+    }        
+    // Disable common GPIO
+    //msm_sensor_power_down(s_ctrl);
+    // Disable imx091 GPIO
+    imx091_power_down(s_ctrl->sensordata, false);
+    msleep(100); // wait for regulator output stop
 
     return rc;
 }
@@ -2058,7 +2065,20 @@ static ssize_t imx091_proc_write_camera_fled(struct file *filp, const char __use
 static ssize_t imx091_proc_read_camera_power(char *page, char **start, off_t off, int count, 
             	int *eof, void *data)
 {
-	return 0;
+	int len=0;
+       unsigned char camera_power_enable = false;
+       
+	if(*eof == 0){
+              if(g_mi1040_power == true || g_imx091_power == true){
+                    camera_power_enable = true;
+              }else{
+                    camera_power_enable = false;
+              }
+		len+=sprintf(page+len, "%x\n", camera_power_enable);
+		*eof = 1;
+		pr_info("%s:CameraPowe=%s", __func__, (char *)page);
+	}
+	  return len;
 }
 
 static ssize_t imx091_proc_write_camera_power(struct file *filp, const char __user *buff, 

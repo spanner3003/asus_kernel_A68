@@ -30,7 +30,7 @@
 #define PM8921_GPIO_BASE		NR_GPIO_IRQS
 #define PM8921_GPIO_PM_TO_SYS(pm_gpio)	(pm_gpio - 1 + PM8921_GPIO_BASE)
 
-static unsigned char g_mi1040_power = false; 
+unsigned char g_mi1040_power = false; 
 extern bool iCatch_first_open;  // LiJen: for iCatch ISP used
 //ASUS_BSP --- LiJen "[A68][13M][NA][Others]Full porting for 13M camera with ISP"
 
@@ -490,7 +490,7 @@ static int32_t mi1040_sensor_setting(struct msm_sensor_ctrl_t *s_ctrl,
                     pr_info("Switch preview mode\n");
                     sensor_write_reg(imx091_s_ctrl.sensor_i2c_client->client, 0x7106, 0x00);//preview mode
                     sensor_write_reg(imx091_s_ctrl.sensor_i2c_client->client, 0x7120, 0x00);
-
+                    wait_for_AWB_ready();
                     
             }
 
@@ -942,6 +942,11 @@ static int mi1040_power_down(const struct msm_camera_sensor_info *data)
         
 	pr_info("%s +++\n",__func__);
 
+       if(g_mi1040_power == false){
+            pr_info("%s --- power has disabled\n", __func__);
+            return -1;
+       }
+       
 	if(!data)
 	{
 		pr_info("data is NULL, return\n");
@@ -1075,6 +1080,7 @@ static int mi1040_power_down(const struct msm_camera_sensor_info *data)
 		   break;
 	}
 
+       g_mi1040_power = false;
 	pr_info("%s ---\n",__func__);
 	return 0;
 }
@@ -1192,6 +1198,11 @@ static int mi1040_power_up(const struct msm_camera_sensor_info *data)
         
 	pr_info("%s +++\n",__func__);
 
+       if(g_mi1040_power == true){
+            pr_info("%s --- power has enabled\n", __func__);
+            return -1;	            
+       }
+       
 	if(!data)
 	{
 		pr_err("data is NULL, return\n");
@@ -1406,7 +1417,8 @@ static int mi1040_power_up(const struct msm_camera_sensor_info *data)
 			pr_info("gpio GPIO5(%d)\n",gpio_get_value(5));
 			break;
 	}
-    
+
+       g_mi1040_power = true;
 	pr_info("%s ---\n",__func__);
 	return 0;	
 }
@@ -1430,8 +1442,7 @@ int32_t mi1040_sensor_power_up(struct msm_sensor_ctrl_t *s_ctrl)
             pr_err("%s: config common gpio failed\n", __func__);
             goto fail;
         }
-#endif         
-        g_mi1040_power = true;
+#endif                 
     }else{
         pr_info("%s: power has enabled\n", __func__);
     }
@@ -1453,7 +1464,6 @@ int32_t mi1040_sensor_power_down(struct msm_sensor_ctrl_t *s_ctrl)
     }else{
         pr_info("%s: power has disabled\n", __func__);
     }
-    g_mi1040_power = false;
     
     return rc;
 }

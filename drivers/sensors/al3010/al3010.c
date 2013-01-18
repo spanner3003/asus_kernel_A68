@@ -643,7 +643,7 @@ static void mp_als_interrupt_handler(struct work_struct *work)
 
 		/*Get Lux*/
 		g_al3010_light = 0;
-		if ( adc == 0 )
+		if ( adc <= 0 )
 			k_adc = 0;
 		else
 			k_adc = g_al3010_light_shift_calibration + (adc * g_al3010_light_calibration);

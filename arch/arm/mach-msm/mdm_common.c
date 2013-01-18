@@ -171,6 +171,7 @@ static void mdm_restart_reason_fn(struct work_struct *work)
 			set_fs(oldfs);
 #endif
 // ASUS_BSP--- Wenli "Modify for modem restart"
+			ASUSEvtlog("SSR %s\n", sfr_buf);
 			pr_err("mdm restart reason: %s\n", sfr_buf);
 			break;
 		}

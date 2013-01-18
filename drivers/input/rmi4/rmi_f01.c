@@ -24,6 +24,9 @@
 //ASUS_BSP simpson: add for On/Off touch in P03 +++
 static struct rmi_function_container *g_fc;
 #include <linux/workqueue.h>
+static struct workqueue_struct *g_rmi_wq_resume_check;
+static struct delayed_work g_mp_resume_chk_work;
+static void rmi_resume_check_work(struct work_struct *work);
 #ifdef CONFIG_EEPROM_NUVOTON
 #include <linux/microp_notify.h>
 static struct workqueue_struct *g_rmi_wq_attach_detach;
@@ -1032,24 +1035,24 @@ void rmi_driver_init_cfg(struct rmi_function_container *fc, u8 rw)
 
 	retval = rmi_read_block(fc->rmi_dev, F01_RMI_QUERY18, F01_fw_id, ARRAY_SIZE(F01_fw_id));
 	PR_ID = F01_fw_id[0] | (F01_fw_id[1] << 8) | (F01_fw_id[2] << 16);
-	printk("[touch_synaptics] RMI Packrat ID = %d\n", PR_ID);
+	rmi_debug(DEBUG_INFO, "[touch_synaptics] RMI Packrat ID = %d\n", PR_ID);
 	retval = rmi_read_block(fc->rmi_dev, F34_FLASH_CTRL00, F34_cfg_id, ARRAY_SIZE(F34_cfg_id));
-	printk("[touch_synaptics] RMI Config ID = %02x%02x%02x%02x\n", F34_cfg_id[0], F34_cfg_id[1], F34_cfg_id[2], F34_cfg_id[3]);
+	rmi_debug(DEBUG_INFO, "[touch_synaptics] RMI Config ID = %02x%02x%02x%02x\n", F34_cfg_id[0], F34_cfg_id[1], F34_cfg_id[2], F34_cfg_id[3]);
 	if (rw)
 		retval = rmi_write_block(fc->rmi_dev, F54_ANALOG_CTRL03, (u8 *)&F54_Touch_Thre, sizeof(F54_Touch_Thre));
 	retval = rmi_read_block(fc->rmi_dev, F54_ANALOG_CTRL03, (u8 *)&F54_Touch_Thre, sizeof(F54_Touch_Thre));
-	printk("[touch_synaptics] F54_Touch_Thre = %d\n", F54_Touch_Thre);
+	rmi_debug(DEBUG_INFO, "[touch_synaptics] F54_Touch_Thre = %d\n", F54_Touch_Thre);
 	Duration_buf[0] = F54_Duration & 0xFF;
 	Duration_buf[1] = (F54_Duration & 0xFF00) >> 8;
 	if (rw)
 		retval = rmi_write_block(fc->rmi_dev, F54_ANALOG_CTRL08, Duration_buf, ARRAY_SIZE(Duration_buf));
 	retval = rmi_read_block(fc->rmi_dev, F54_ANALOG_CTRL08, Duration_buf, ARRAY_SIZE(Duration_buf));
 	F54_Duration = Duration_buf[0] | (Duration_buf[1] << 8);
-	printk("[touch_synaptics] F54_Duration = %d\n", F54_Duration);
+	rmi_debug(DEBUG_INFO, "[touch_synaptics] F54_Duration = %d\n", F54_Duration);
 
 	if (rw){
 		retval = rmi_write_block(fc->rmi_dev, F54_AD_CMD, (u8 *)&F54_FroceUpdate, sizeof(F54_FroceUpdate));
-		printk("[touch_synaptics] F54_Force_Update!!\n");
+		rmi_debug(DEBUG_INFO, "[touch_synaptics] F54_Force_Update!!\n");
 	}
 
 }
@@ -1062,7 +1065,7 @@ static int rmi_f01_sw_reset(struct rmi_function_container *fc)
 	/* Command register always reads as 0, so we can just use a local. */
 	union f01_device_commands commands = {};
 
-	printk("[touch_synaptics] rmi_f01_reset ++\n");
+	rmi_debug(DEBUG_INFO, "[touch_synaptics] rmi_f01_reset ++\n");
 	/* Per spec, 0 has no effect, so we skip it entirely. */
 	commands.reset = 1;
 	retval = rmi_write_block(fc->rmi_dev, fc->fd.command_base_addr,
@@ -1072,8 +1075,8 @@ static int rmi_f01_sw_reset(struct rmi_function_container *fc)
 			"error = %d.", __func__, retval);
 		return retval;
 	}
-	msleep(300);
-	printk("[touch_synaptics] rmi_f01_reset --\n");
+	//msleep(300);
+	rmi_debug(DEBUG_INFO, "[touch_synaptics] rmi_f01_reset --\n");
 
 	return retval;
 }
@@ -1088,22 +1091,22 @@ static int rmi_f01_fast_relax(struct rmi_function_container *fc)
 	unsigned char F54_ForceFastRelax = 0x24;
 	unsigned char F54_FroceUpdate = 0x04;
 
-	printk("[touch_synaptics] rmi_f01_fast_relax-on ++\n");
+	rmi_debug(DEBUG_INFO, "[touch_synaptics] rmi_f01_fast_relax-on ++\n");
 
 	retval = rmi_read_block(fc->rmi_dev, F54_ANALOG_CTRL00, (u8 *)&F54_ForceFastRelax_old, sizeof(F54_ForceFastRelax_old));
-	printk("[touch_synaptics] F54_ForceFastRelax_old = %d\n", F54_ForceFastRelax_old);
+	rmi_debug(DEBUG_VERBOSE, "[touch_synaptics] F54_ForceFastRelax_old = %d\n", F54_ForceFastRelax_old);
 	retval = rmi_write_block(fc->rmi_dev, F54_ANALOG_CTRL00, (u8 *)&F54_ForceFastRelax, sizeof(F54_ForceFastRelax));
 	retval = rmi_read_block(fc->rmi_dev, F54_ANALOG_CTRL00, (u8 *)&F54_ForceFastRelax, sizeof(F54_ForceFastRelax));
-	printk("[touch_synaptics] F54_ForceFastRelax_new = %d\n", F54_ForceFastRelax);
+	rmi_debug(DEBUG_VERBOSE, "[touch_synaptics] F54_ForceFastRelax_new = %d\n", F54_ForceFastRelax);
 	retval = rmi_write_block(fc->rmi_dev, F54_AD_CMD, (u8 *)&F54_FroceUpdate, sizeof(F54_FroceUpdate));
-	printk("[touch_synaptics] F54_Force_Update!!\n");
+	rmi_debug(DEBUG_VERBOSE, "[touch_synaptics] F54_Force_Update!!\n");
 
 	if(delayed_work_pending(&fast_relax_work)) {
 		cancel_delayed_work_sync(&fast_relax_work);
 	}
 	queue_delayed_work(fast_relax_workqueue, &fast_relax_work, HZ*2.5);
 
-	printk("[touch_synaptics] rmi_f01_fast_relax-on --\n");
+	rmi_debug(DEBUG_INFO, "[touch_synaptics] rmi_f01_fast_relax-on --\n");
 
 	return retval;
 }
@@ -1113,14 +1116,14 @@ static void fast_relax_off(struct work_struct *work){
 	unsigned char F54_ForceFastRelax = 0x20;
 	unsigned char F54_FroceUpdate = 0x04;
 
-	printk("[touch_synaptics] rmi_f01_fast_relax-off ++\n");
+	rmi_debug(DEBUG_INFO, "[touch_synaptics] rmi_f01_fast_relax-off ++\n");
 	retval = rmi_read_block(g_fc->rmi_dev, F54_ANALOG_CTRL00, (u8 *)&F54_ForceFastRelax_old, sizeof(F54_ForceFastRelax_old));
-	printk("[touch_synaptics] F54_ForceFastRelax_old = %d\n", F54_ForceFastRelax_old);
+	rmi_debug(DEBUG_VERBOSE, "[touch_synaptics] F54_ForceFastRelax_old = %d\n", F54_ForceFastRelax_old);
 	retval = rmi_write_block(g_fc->rmi_dev, F54_ANALOG_CTRL00, (u8 *)&F54_ForceFastRelax, sizeof(F54_ForceFastRelax));
 	retval = rmi_read_block(g_fc->rmi_dev, F54_ANALOG_CTRL00, (u8 *)&F54_ForceFastRelax, sizeof(F54_ForceFastRelax));
-	printk("[touch_synaptics] F54_ForceFastRelax_new = %d\n", F54_ForceFastRelax);
+	rmi_debug(DEBUG_VERBOSE, "[touch_synaptics] F54_ForceFastRelax_new = %d\n", F54_ForceFastRelax);
 	retval = rmi_write_block(g_fc->rmi_dev, F54_AD_CMD, (u8 *)&F54_FroceUpdate, sizeof(F54_FroceUpdate));
-	printk("[touch_synaptics] rmi_f01_fast_relax-off --\n");
+	rmi_debug(DEBUG_INFO, "[touch_synaptics] rmi_f01_fast_relax-off --\n");
 
 }
 #endif
@@ -1377,10 +1380,15 @@ static int rmi_f01_initialize(struct rmi_function_container *fc)
 		goto error_exit;
 	}
 //ASUS_BSP simpson: add for On/Off touch in P03 +++
+	g_rmi_wq_resume_check = create_singlethread_workqueue("g_rmi_wq_resume_check");
+	if (!g_rmi_wq_resume_check) {
+		rmi_debug(DEBUG_INFO, "[touch_synaptics] %s: create workqueue failed: g_rmi_wq_resume_check\n", __func__);
+	}
+	INIT_DELAYED_WORK(&g_mp_resume_chk_work, rmi_resume_check_work);
 #ifdef CONFIG_EEPROM_NUVOTON
 	g_rmi_wq_attach_detach = create_singlethread_workqueue("g_rmi_wq_attach_detach");
 	if (!g_rmi_wq_attach_detach) {
-		printk("[touch_synaptics] %s: create workqueue failed: g_rmi_wq_attach_detach\n", __func__);
+		rmi_debug(DEBUG_INFO, "[touch_synaptics] %s: create workqueue failed: g_rmi_wq_attach_detach\n", __func__);
 	}
 	INIT_WORK(&g_mp_attach_work, attach_padstation_work);
 	//INIT_WORK(&g_mp_detach_work, detach_padstation_work);
@@ -1500,6 +1508,47 @@ static int rmi_f01_reset(struct rmi_function_container *fc)
 
 
 #ifdef CONFIG_PM
+#define RETRY_MAX 4
+extern int do_initial_reset(struct rmi_device *rmi_dev);
+static int rmi_f01_clear_irqs(struct rmi_function_container *fc);
+static void rmi_resume_check_work(struct work_struct *work)
+{
+	struct rmi_driver_data *driver_data = rmi_get_driverdata(g_fc->rmi_dev);
+	struct f01_data *data = driver_data->f01_container->data;
+	int retry;
+	static int blocked=0;
+
+	rmi_debug(DEBUG_INFO, "[touch_synaptics] rmi_resume_check_work()++\n");
+
+	for(retry=0; retry<RETRY_MAX && g_XY == 0xFFFFFFFF && !data->suspended; retry++) {
+		rmi_debug(DEBUG_INFO, "[touch_synaptics] resume_check(%d).\n",retry);
+		if(retry<3){
+			rmi_debug(DEBUG_VERBOSE, "[touch_synaptics] resume_check(clear-irqs)\n");
+			rmi_f01_clear_irqs(g_fc);
+		}else if(retry<4){
+			rmi_debug(DEBUG_VERBOSE, "[touch_synaptics] resume_check(sw_reset)\n");
+			rmi_f01_sw_reset(g_fc);
+		}else{
+			rmi_debug(DEBUG_VERBOSE, "[touch_synaptics] resume_check(init_reset)\n");
+			do_initial_reset(g_fc->rmi_dev);
+		}
+		ASUSEvtlog("[touch_synaptics] rmi_resume_check_work-reset(%d).\n",retry);
+		msleep((retry+1)*1000);
+	}
+	if((g_XY == 0xFFFFFFFF)&&(retry==RETRY_MAX)){
+		if(blocked>=2){
+			rmi_debug(DEBUG_INFO, "[touch_synaptics] still no activity on screen!(init_reset)\n");
+			do_initial_reset(g_fc->rmi_dev);
+			blocked=0;
+		} else {
+			blocked++;
+		}
+	} else {
+		blocked=0;
+	}
+	rmi_debug(DEBUG_INFO, "[touch_synaptics] rmi_resume_check_work(%d)--\n", blocked);
+}
+
 static int rmi_f01_suspend(struct rmi_function_container *fc)
 {
 	struct rmi_device *rmi_dev = fc->rmi_dev;
@@ -1507,13 +1556,13 @@ static int rmi_f01_suspend(struct rmi_function_container *fc)
 	struct f01_data *data = driver_data->f01_container->data;
 	int retval = 0;
 
-	printk("[touch_synaptics] rmi_f01_suspend(%d) ++\n", data->suspended);
+	rmi_debug(DEBUG_INFO, "[touch_synaptics] rmi_f01_suspend(%d) ++\n", data->suspended);
 	//force turn-off keypad_backlight ++
 	if(delayed_work_pending(&keypad_off_work)) {
 		cancel_delayed_work_sync(&keypad_off_work);
 	}
 	rmi_led_trigger_event(keypad_led_trigger, 0);
-	printk("[touch_synaptics] F01 force turn-off keypad_backlight\n");
+	rmi_debug(DEBUG_VERBOSE, "[touch_synaptics] F01 force turn-off keypad_backlight\n");
 	//force turn-off keypad_backlight --
 	dev_dbg(&fc->dev, "Suspending...\n");
 	if (data->suspended)
@@ -1536,7 +1585,10 @@ static int rmi_f01_suspend(struct rmi_function_container *fc)
 		data->suspended = true;
 		retval = 0;
 	}
-	printk("[touch_synaptics] rmi_f01_suspend(%d) --\n", data->suspended);
+	if(delayed_work_pending(&g_mp_resume_chk_work)) {
+		cancel_delayed_work_sync(&g_mp_resume_chk_work);
+	}
+	rmi_debug(DEBUG_INFO, "[touch_synaptics] rmi_f01_suspend(%d) --\n", data->suspended);
 
 	return retval;
 }
@@ -1548,7 +1600,7 @@ static int rmi_f01_resume(struct rmi_function_container *fc)
 	struct f01_data *data = driver_data->f01_container->data;
 	int retval = 0;
 
-	printk("[touch_synaptics] rmi_f01_resume(%d) ++\n", data->suspended);
+	rmi_debug(DEBUG_INFO, "[touch_synaptics] rmi_f01_resume(%d) ++\n", data->suspended);
 	dev_dbg(&fc->dev, "Resuming...\n");
 	if (!data->suspended)
 		return 0;
@@ -1576,8 +1628,12 @@ static int rmi_f01_resume(struct rmi_function_container *fc)
 	//ASUS_BSP simpson: add for ASUSEvtlog +++
 	ASUSEvtlog("[touch_synaptics] rmi_f01_resume(%d) --\n", data->suspended);
 	//ASUS_BSP simpson: add for ASUSEvtlog ---
-	rmi_f01_sw_reset(g_fc);
-	printk("[touch_synaptics] rmi_f01_resume(%d) --\n", data->suspended);
+	//rmi_f01_sw_reset(g_fc);
+	if(delayed_work_pending(&g_mp_resume_chk_work)) {
+		cancel_delayed_work_sync(&g_mp_resume_chk_work);
+	}
+	queue_delayed_work(g_rmi_wq_resume_check, &g_mp_resume_chk_work, msecs_to_jiffies(500));
+	rmi_debug(DEBUG_INFO, "[touch_synaptics] rmi_f01_resume(%d) --\n", data->suspended);
 
 	return retval;
 }
@@ -1648,35 +1704,35 @@ static struct rmi_function_handler function_handler = {
 #ifdef CONFIG_HAS_EARLYSUSPEND
 static void rmi_f01_early_suspend(struct early_suspend *h)
 {
-	printk("[touch_synaptics] rmi_f01_early_suspend ++\n");
+	rmi_debug(DEBUG_INFO, "[touch_synaptics] rmi_f01_early_suspend ++\n");
 
 	if ( g_bFoneInPad == false ){
 		rmi_f01_suspend(g_fc);
 	} else {
-		printk("[touch_synaptics] PadAttached!\n");
+		rmi_debug(DEBUG_INFO, "[touch_synaptics] PadAttached!\n");
 	//force turn-off keypad_backlight ++
 	if(delayed_work_pending(&keypad_off_work)) {
 		cancel_delayed_work_sync(&keypad_off_work);
 	}
 	rmi_led_trigger_event(keypad_led_trigger, 0);
-	printk("[touch_synaptics] F01 force turn-off keypad_backlight\n");
+	rmi_debug(DEBUG_VERBOSE, "[touch_synaptics] F01 force turn-off keypad_backlight\n");
 	//force turn-off keypad_backlight --
 	}
 
-	printk("[touch_synaptics] rmi_f01_early_suspend --\n");
+	rmi_debug(DEBUG_INFO, "[touch_synaptics] rmi_f01_early_suspend --\n");
 }
 
 static void rmi_f01_late_resume(struct early_suspend *h)
 {
-	printk("[touch_synaptics] rmi_f01_late_resume ++\n");
+	rmi_debug(DEBUG_INFO, "[touch_synaptics] rmi_f01_late_resume ++\n");
 
 	if ( g_bFoneInPad == false ){
 		rmi_f01_resume(g_fc);
 	} else {
-		printk("[touch_synaptics] PadAttached!\n");
+		rmi_debug(DEBUG_INFO, "[touch_synaptics] PadAttached!\n");
 	}
 
-	printk("[touch_synaptics] rmi_f01_late_resume --\n");
+	rmi_debug(DEBUG_INFO, "[touch_synaptics] rmi_f01_late_resume --\n");
 }
 
 static struct early_suspend rmi_early_suspend_desc = {
@@ -1714,6 +1770,7 @@ static int __init rmi_f01_module_init(void)
 
 static void __exit rmi_f01_module_exit(void)
 {
+	destroy_workqueue(g_rmi_wq_resume_check);
 #ifdef CONFIG_EEPROM_NUVOTON
 	destroy_workqueue(g_rmi_wq_attach_detach);
 	unregister_microp_notifier(&touch_mp_notifier);
@@ -1737,21 +1794,21 @@ static int rmi_f01_clear_irqs(struct rmi_function_container *fc)
 	int retval;
 	struct rmi_device *rmi_dev = fc->rmi_dev;
 
-	printk("[touch_synaptics] rmi_f01_clear_irqs++\n");
+	rmi_debug(DEBUG_INFO, "[touch_synaptics] rmi_f01_clear_irqs++\n");
 	/* dummy read in order to clear irqs */
 	retval = rmi_read(rmi_dev, fc->fd.data_base_addr + 1, &temp);
 	if (retval < 0) {
 		dev_err(&fc->dev, "Failed to read Interrupt Status.\n");
 		return retval;
 	}
-	printk("[touch_synaptics] rmi_f01_clear_irqs--\n");
+	rmi_debug(DEBUG_INFO, "[touch_synaptics] rmi_f01_clear_irqs--\n");
 
 	return retval;
 }
 
 static void attach_padstation_work(struct work_struct *work)
 {
-	printk("[touch_synaptics] attach_padstation_work()++\n");
+	rmi_debug(DEBUG_INFO, "[touch_synaptics] attach_padstation_work()++\n");
 	g_bFoneInPad = true;
 
 	rmi_f01_suspend(g_fc);
@@ -1760,12 +1817,12 @@ static void attach_padstation_work(struct work_struct *work)
 	//ASUS_BSP simpson: add for ASUSEvtlog +++
 	ASUSEvtlog("[touch_synaptics] attach_padstation_work finished.");
 	//ASUS_BSP simpson: add for ASUSEvtlog ---
-	printk("[touch_synaptics] attach_padstation_work()--\n");
+	rmi_debug(DEBUG_INFO, "[touch_synaptics] attach_padstation_work()--\n");
 }
 
 static void detach_padstation_work(struct work_struct *work)
 {
-	printk("[touch_synaptics] detach_padstation_work()++\n");
+	rmi_debug(DEBUG_INFO, "[touch_synaptics] detach_padstation_work()++\n");
 
 	//msleep(10);
 	rmi_f01_resume(g_fc);
@@ -1780,20 +1837,20 @@ static void detach_padstation_work(struct work_struct *work)
 	//ASUS_BSP simpson: add for ASUSEvtlog +++
 	ASUSEvtlog("[touch_synaptics] detach_padstation_work finished.");
 	//ASUS_BSP simpson: add for ASUSEvtlog ---
-	printk("[touch_synaptics] detach_padstation_work()--\n");
+	rmi_debug(DEBUG_INFO, "[touch_synaptics] detach_padstation_work()--\n");
 }
 
 int touch_attach_padstation(void)
 {
-	printk("[touch_synaptics] touch_attach_padstation()++\n");
+	rmi_debug(DEBUG_INFO, "[touch_synaptics] touch_attach_padstation()++\n");
 
 	if(delayed_work_pending(&g_mp_detach_work)) {
 		cancel_delayed_work_sync(&g_mp_detach_work);
-	printk("[touch_synaptics] cancel last detach_work\n");
+	rmi_debug(DEBUG_VERBOSE, "[touch_synaptics] cancel last detach_work\n");
 	}
 	queue_work(g_rmi_wq_attach_detach, &g_mp_attach_work);
 
-	printk("[touch_synaptics] touch_attach_padstation()--\n");
+	rmi_debug(DEBUG_INFO, "[touch_synaptics] touch_attach_padstation()--\n");
 
 	return 0;
 }
@@ -1801,7 +1858,7 @@ EXPORT_SYMBOL(touch_attach_padstation);
 
 int touch_detach_padstation(void)
 {
-	printk("[touch_synaptics] touch_detach_padstation()++\n");
+	rmi_debug(DEBUG_INFO, "[touch_synaptics] touch_detach_padstation()++\n");
 
 	//queue_work(g_rmi_wq_attach_detach, &g_mp_detach_work);
 	if(delayed_work_pending(&g_mp_detach_work)) {
@@ -1809,7 +1866,7 @@ int touch_detach_padstation(void)
 	}
 	queue_delayed_work(g_rmi_wq_attach_detach, &g_mp_detach_work, msecs_to_jiffies(2000));
 
-	printk("[touch_synaptics] touch_detach_padstation()--\n");
+	rmi_debug(DEBUG_INFO, "[touch_synaptics] touch_detach_padstation()--\n");
 
 	return 0;
 }
@@ -1821,26 +1878,26 @@ static int touch_mp_event(struct notifier_block *this, unsigned long event, void
         switch (event) {
 
         case P01_ADD:
-                printk("[touch_synaptics][MicroP] P01_ADD++\n");
+                rmi_debug(DEBUG_INFO, "[touch_synaptics][MicroP] P01_ADD++\n");
 		//ASUS_BSP simpson: add for ASUSEvtlog +++
 		ASUSEvtlog("[touch_synaptics][MicroP] P03_ADDED");
 		//ASUS_BSP simpson: add for ASUSEvtlog ---
 
                 touch_attach_padstation();
 
-                printk("[touch_synaptics][MicroP] P01_ADD--\n");
+                rmi_debug(DEBUG_INFO, "[touch_synaptics][MicroP] P01_ADD--\n");
 
                 return NOTIFY_DONE;
 
         case P01_REMOVE:
-                printk("[touch_synaptics][MicroP] P01_REMOVE++\n");
+                rmi_debug(DEBUG_INFO, "[touch_synaptics][MicroP] P01_REMOVE++\n");
 		//ASUS_BSP simpson: add for ASUSEvtlog +++
 		ASUSEvtlog("[touch_synaptics][MicroP] P03_REMOVED");
 		//ASUS_BSP simpson: add for ASUSEvtlog ---
 
                 touch_detach_padstation();
 
-                printk("[touch_synaptics][MicroP] P01_REMOVE--\n");
+                rmi_debug(DEBUG_INFO, "[touch_synaptics][MicroP] P01_REMOVE--\n");
 
                 return NOTIFY_DONE;
 

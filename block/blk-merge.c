@@ -141,7 +141,22 @@ int blk_rq_map_sg(struct request_queue *q, struct request *rq,
 				goto new_segment;
 			if (!BIOVEC_SEG_BOUNDARY(q, bvprv, bvec))
 				goto new_segment;
-
+//ASUS_BSP +++ Josh_Liao "fix dma cache page fault"
+//QCT case number:01039938
+			/*
+			* Test code
+			* If PHYS_MERGEABLE, SEG_BOUNDARY, bv_page should be contiguous.
+			* But, page structure arrays can be non-contiguous if SPASEMEM is enabled.
+			* So, if bv_page are not same nor nested, make a new segment.
+			*/
+			if (!((unsigned long)(bvprv->bv_page) == (unsigned long)(bvec->bv_page)
+				|| (unsigned long)(bvprv->bv_page + 1) == (unsigned long)(bvec->bv_page))) {
+				//      printk("debug : bvprv->bv_page %lx, %lx\n", (unsigned long)(bvprv->bv_page), bvec_to_phys(bvprv)
+				//      printk("debug : bvec->bv_page %lx, %lx\n", (unsigned long)(bvec->bv_page), bvec_to_phys(bvec));
+				//      BUG();
+				goto new_segment;
+			}
+//ASUS_BSP --- Josh_Liao "fix dma cache page fault"
 			sg->length += nbytes;
 		} else {
 new_segment:
