@@ -624,7 +624,7 @@ int mdp4_dtv_on(struct platform_device *pdev)
 	vctrl->dev = mfd->fbi->dev;
 	vctrl->fake_vsync = 1;
 
-	//mdp_footswitch_ctrl(TRUE);    //ASUS_BSP:Louis
+	mdp_footswitch_ctrl(TRUE);
 	/* Mdp clock enable */
 	mdp_clk_ctrl(1);
 
@@ -694,7 +694,7 @@ int mdp4_dtv_off(struct platform_device *pdev)
 	mdp4_overlay_panel_mode_unset(MDP4_MIXER1, MDP4_PANEL_DTV);
 
 	ret = panel_next_off(pdev);
-	//mdp_footswitch_ctrl(FALSE);   //ASUS_BSP:Louis
+	mdp_footswitch_ctrl(FALSE);
 	vctrl->fake_vsync = 1;
 
 	/* Mdp clock disable */

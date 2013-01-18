@@ -639,3 +639,6 @@ CONFIG_NFC_DEVICES=y
 # ASUS_BSP+++ BennyCheng "add CONFIG_ASUS_USB_OTG for enable/disable phone mode otg support"
 CONFIG_ASUS_USB_OTG=y
 # ASUS_BSP--- BennyCheng "add CONFIG_ASUS_USB_OTG for enable/disable phone mode otg support"
+#ASUS_BSP Josh_Liao +++
+CONFIG_DEFAULT_NOOP=y
+#ASUS_BSP Josh_Liao ---

@@ -774,7 +774,7 @@ static void qup_i2c_recover_bus_busy(struct qup_i2c_dev *dev)
 
 	dev_warn(dev->dev, "Bus still busy, status %x\n", status);
 //ASUS_BSP+++ for reset/re-init MHL TX	
-	if ((dev->adapter.nr == APQ_8064_GSBI4_QUP_I2C_BUS_ID) && (dev->msg->addr == 0x4f))
+/*	if ((dev->adapter.nr == APQ_8064_GSBI4_QUP_I2C_BUS_ID) && (dev->msg->addr == 0x4f))
 	{
 		dev_warn(dev->dev, "+++ Bus still busy, MHL disable irq, reset/re-init MHL TX\n");	
 		MHL_disable_irq();
@@ -782,7 +782,7 @@ static void qup_i2c_recover_bus_busy(struct qup_i2c_dev *dev)
 		MHL_enable_irq();		
 		SiiMhlTxInitialize(30);		
 		dev_warn(dev->dev, "--- Bus still busy, MHL disable irq, reset/re-init MHL TX\n");			
-	}
+	}*/
 //ASUS_BSP--- for reset/re-init MHL TX	
 recovery_end:
 	enable_irq(dev->err_irq);

@@ -3184,7 +3184,7 @@ static void asus_battery_early_suspend(struct early_suspend *h)
 
 static void asus_battery_late_resume(struct early_suspend *h)
 {
-	printk("[BAT]late_resume\r\n");
+	//printk("[BAT]late_resume\r\n");
 	asus_onBatteryForceResume();
 }
 

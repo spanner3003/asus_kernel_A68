@@ -314,13 +314,16 @@ void mmc_start_bkops(struct mmc_card *card)
 
 	mmc_claim_host(card->host);
 
-	timeout = (card->ext_csd.raw_bkops_status >= EXT_CSD_BKOPS_LEVEL_2) ?
-		MMC_BKOPS_MAX_TIMEOUT : 0;
+//ASUS_BSP +++ Josh_Liao "use nonblocking BKOPS"
+//	timeout = (card->ext_csd.raw_bkops_status >= EXT_CSD_BKOPS_LEVEL_2) ?
+//		MMC_BKOPS_MAX_TIMEOUT : 0;
+	timeout = 0;
+//ASUS_BSP --- Josh_Liao "use nonblocking BKOPS"
 
 	err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
 			EXT_CSD_BKOPS_START, 1, timeout);
 	if (err) {
-		pr_warning("%s: error %d starting bkops\n",
+		pr_err("%s: error %d starting bkops\n",
 			   mmc_hostname(card->host), err);
 		mmc_card_clr_need_bkops(card);
 		goto out;
@@ -334,10 +337,14 @@ void mmc_start_bkops(struct mmc_card *card)
 	 * bkops executed synchronously, otherwise
 	 * the operation is in progress
 	 */
-	if (card->ext_csd.raw_bkops_status >= EXT_CSD_BKOPS_LEVEL_2)
-		mmc_card_set_check_bkops(card);
-	else
+	if (card->ext_csd.raw_bkops_status >= EXT_CSD_BKOPS_LEVEL_2) {
+//ASUS_BSP +++ Josh_Liao "use nonblocking BKOPS"
+//		mmc_card_set_check_bkops(card);
 		mmc_card_set_doing_bkops(card);
+//ASUS_BSP --- Josh_Liao "use nonblocking BKOPS"
+	} else {
+		mmc_card_set_doing_bkops(card);
+	}
 
 	spin_unlock_irqrestore(&card->host->lock, flags);
 out:
@@ -550,6 +557,87 @@ out:
 }
 EXPORT_SYMBOL(mmc_interrupt_hpi);
 
+//josh++
+extern void pet_watchdog(void);
+
+int mmc_interrupt_hpi_sp(struct mmc_card *card, bool is_suspend)
+{
+	int err;
+	u32 status;
+	int dbg_cnt = 0;
+
+	BUG_ON(!card);
+
+	if (!card->ext_csd.hpi_en) {
+		pr_info("%s: HPI enable bit unset\n", mmc_hostname(card->host));
+		return 1;
+	}
+
+	mmc_claim_host(card->host);
+	err = mmc_send_status(card, &status);
+	if (err) {
+		pr_err("%s: Get card status fail\n", mmc_hostname(card->host));
+		goto out;
+	}
+
+	/*
+	 * If the card status is in PRG-state, we can send the HPI command.
+	 */
+	if (R1_CURRENT_STATE(status) == R1_STATE_PRG) {
+		do {
+			/*
+			 * We don't know when the HPI command will finish
+			 * processing, so we need to resend HPI until out
+			 * of prg-state, and keep checking the card status
+			 * with SEND_STATUS.  If a timeout error occurs when
+			 * sending the HPI command, we are already out of
+			 * prg-state.
+			 */
+			err = mmc_send_hpi_cmd(card, &status);
+			if (err) {
+				if ((dbg_cnt%20) == 0) {
+					pet_watchdog();
+					pr_err("%s: abort HPI (%d error), cnt:%d, rsp:%#x\n",
+					 	mmc_hostname(card->host), err, dbg_cnt, status);
+
+				}
+
+				if (is_suspend && (dbg_cnt >= 600)) {
+					pr_err("%s, break when retry over 600 during suspend\n", mmc_hostname(card->host));
+					break;
+				}
+			}
+
+			if (!is_suspend)
+				mmc_delay(10);
+
+			err = mmc_send_status(card, &status);
+			if (err)
+				break;
+
+			dbg_cnt++;
+
+			if (!is_suspend)
+				mmc_delay(10);
+		} while (R1_CURRENT_STATE(status) == R1_STATE_PRG);
+	} else
+		pr_debug("%s: Left prg-state\n", mmc_hostname(card->host));
+
+	if (err)
+		pr_err("%s: %s() send hpi fail:%d with cnt:%d\n",
+		       mmc_hostname(card->host), __func__, err, dbg_cnt);
+	else
+		pr_info("%s: %s() send hpi done with cnt:%d\n",
+		       mmc_hostname(card->host), __func__, dbg_cnt);
+
+out:
+	mmc_release_host(card->host);
+	return err;
+}
+EXPORT_SYMBOL(mmc_interrupt_hpi_sp);
+//josh--
+
+
 /**
  *	mmc_wait_for_cmd - start a command and wait for completion
  *	@host: MMC host to start command
@@ -600,10 +688,37 @@ int mmc_interrupt_bkops(struct mmc_card *card)
 	spin_lock_irqsave(&card->host->lock, flags);
 	mmc_card_clr_doing_bkops(card);
 	spin_unlock_irqrestore(&card->host->lock, flags);
-
+//ASUS_BSP +++ Josh_Liao "use nonblocking BKOPS"
+	if (err)
+		pr_err("%s: send hpi fail:%d\n",
+		       mmc_hostname(card->host), err);
+	else
+		pr_info("%s: send hpi done\n",
+		       mmc_hostname(card->host));
+//ASUS_BSP --- Josh_Liao "use nonblocking BKOPS"
 	return err;
 }
 EXPORT_SYMBOL(mmc_interrupt_bkops);
+
+//josh++
+int mmc_interrupt_bkops_sp(struct mmc_card *card, bool is_suspend)
+{
+	int err = 0;
+	unsigned long flags;
+
+	BUG_ON(!card);
+
+	err = mmc_interrupt_hpi_sp(card, is_suspend);
+
+	spin_lock_irqsave(&card->host->lock, flags);
+	mmc_card_clr_doing_bkops(card);
+	spin_unlock_irqrestore(&card->host->lock, flags);
+
+	return err;
+}
+EXPORT_SYMBOL(mmc_interrupt_bkops_sp);
+//josh--
+
 
 int mmc_read_bkops_status(struct mmc_card *card)
 {
@@ -2477,6 +2592,8 @@ int mmc_suspend_host(struct mmc_host *host)
 {
 	int err = 0;
 
+	pr_info("%s: %s()+++\n", mmc_hostname(host), __func__); //josh++
+
 	if (mmc_bus_needs_resume(host))
 		return 0;
 
@@ -2507,8 +2624,17 @@ int mmc_suspend_host(struct mmc_host *host)
 
 		if (!err) {
 			if (host->bus_ops->suspend) {
-				if (mmc_card_doing_bkops(host->card))
-					mmc_interrupt_bkops(host->card);
+				if (mmc_card_doing_bkops(host->card)) {
+//josh++
+//					mmc_interrupt_bkops(host->card);
+					pr_info("%s, interrupt bkops during suspend\n", mmc_hostname(host));
+					err = mmc_interrupt_bkops_sp(host->card, true);
+					if (err){
+						mmc_bus_put(host);
+						goto out;
+					}
+//josh--
+				}
 
 				err = host->bus_ops->suspend(host);
 			}
@@ -2540,6 +2666,7 @@ int mmc_suspend_host(struct mmc_host *host)
 		mmc_power_off(host);
 
 out:
+	pr_info("%s: %s()---(err 0x%x)\n", mmc_hostname(host), __func__,err); //josh++
 	return err;
 }
 
@@ -2552,6 +2679,8 @@ EXPORT_SYMBOL(mmc_suspend_host);
 int mmc_resume_host(struct mmc_host *host)
 {
 	int err = 0;
+
+	pr_info("%s: %s()+++\n", mmc_hostname(host), __func__); //josh++
 
 	mmc_bus_get(host);
 	if (mmc_bus_manual_resume(host)) {
@@ -2588,6 +2717,8 @@ int mmc_resume_host(struct mmc_host *host)
 	}
 	host->pm_flags &= ~MMC_PM_KEEP_POWER;
 	mmc_bus_put(host);
+
+	pr_info("%s: %s()---\n", mmc_hostname(host), __func__); //josh++
 
 	return err;
 }

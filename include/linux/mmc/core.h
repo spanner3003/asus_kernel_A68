@@ -143,6 +143,10 @@ extern int mmc_is_exception_event(struct mmc_card *, unsigned int);
 extern struct mmc_async_req *mmc_start_req(struct mmc_host *,
 					   struct mmc_async_req *, int *);
 extern int mmc_interrupt_hpi(struct mmc_card *);
+//josh++
+extern int mmc_interrupt_bkops_sp(struct mmc_card *, bool);
+extern int mmc_interrupt_hpi_sp(struct mmc_card *, bool);
+//josh--
 extern void mmc_wait_for_req(struct mmc_host *, struct mmc_request *);
 extern int mmc_wait_for_cmd(struct mmc_host *, struct mmc_command *, int);
 extern int mmc_app_cmd(struct mmc_host *, struct mmc_card *);

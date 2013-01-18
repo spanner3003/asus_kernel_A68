@@ -89,7 +89,9 @@ static bool g_bIsPadAttach = false;
 static struct workqueue_struct *g_sis_wq_attach_detach;
 static struct workqueue_struct *g_wq_check_touch;
 static struct delayed_work g_check_touch_work;
+static struct delayed_work g_resume_work;
 static void check_touch_fw_work(struct work_struct *work);
+static void resume_work(struct work_struct *work);
 #ifdef CONFIG_EEPROM_NUVOTON
 static struct work_struct g_mp_attach_work;
 static struct work_struct g_mp_detach_work;
@@ -1462,60 +1464,53 @@ void sis_fw_softreset(struct i2c_client *client)
 //Desmond ++ Add for reset FW, show FW ID, sysfs
 static ssize_t sis_show_fw_id(struct device *dev, struct device_attribute *devattr,char *buf)
 {
-	uint8_t fw_id[12];
-	int i = 0, ret = 0, retry = 5, wakeUpTouchCount = 0;
+	uint8_t fw_id[12] = {0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff};
+	int ret = 0, retry = 15;
 
-	for(i = 0; i < 12; i++){
-		fw_id[i] = g_fw_id[i];
-	}
-	//sis_debug(DEBUG_POWER, "[Touch_sis] sis_show_fw_id: default buf: %c%02x%02x%02x%02x\n", fw_id[4], fw_id[8], fw_id[9], fw_id[10], fw_id[11]);
+	if(g_fw_id[0]==0x97&&g_fw_id[1]==0x31&&g_fw_id[2]==0x30&&g_fw_id[3]==0x38)
+		return sprintf(buf, "%c%02x%02x%02x%02x\n", g_fw_id[4], g_fw_id[8], g_fw_id[9], g_fw_id[10], g_fw_id[11]);
 
 	if(ts_bak){
 		while (retry != 0){
 			ret = get_fw_id(ts_bak->client, fw_id);
 		
 			if(ret < 0){
-				sis_debug(NO_DEBUG, "[Touch_sis] sis_show_fw_id: Failed to read FW ID, retry = %d\n", (6-retry));
+				sis_debug(NO_DEBUG, "[Touch_sis] sis_show_fw_id: Failed to read FW ID, retry = %d\n", (16-retry));
 			}else {
-				if(wakeUpTouchCount < 2){
-					wakeUpTouchCount++;
-				}else {
-					sis_debug(DEBUG_POWER, "[Touch_sis] sis_show_fw_id:#%d %c%02x%02x%02x%02x\n", wakeUpTouchCount, fw_id[4], fw_id[8], fw_id[9], fw_id[10], fw_id[11]);
+				sis_debug(DEBUG_POWER, "[Touch_sis] sis_show_fw_id:#%d %c%02x%02x%02x%02x\n", (16-retry), fw_id[4], fw_id[8], fw_id[9], fw_id[10], fw_id[11]);
+
+				if(fw_id[0]==0x97&&fw_id[1]==0x31&&fw_id[2]==0x30&&fw_id[3]==0x38)
 					break;
-				}
 			}
-			msleep(10);
+			msleep(300);
 			retry--;
 		}
 	}
+
 	return sprintf(buf, "%c%02x%02x%02x%02x\n", fw_id[4], fw_id[8], fw_id[9], fw_id[10], fw_id[11]);
 }
 
 static ssize_t sis_show_full_fw_id(struct device *dev, struct device_attribute *devattr,char *buf)
 {
-	uint8_t fw_id[12];
-	int i = 0, ret = 0, retry = 5, wakeUpTouchCount = 0;
+	uint8_t fw_id[12] = {0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff};
+	int ret = 0, retry = 15;
 
-	for(i = 0; i < 12; i++){
-		fw_id[i] = g_fw_id[i];
-	}
-	//sis_debug(DEBUG_POWER, "[Touch_sis] sis_show_full_fw_id: default buf: %02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x\n", fw_id[0], fw_id[1], fw_id[2], fw_id[3], fw_id[4], fw_id[5], fw_id[6], fw_id[7], fw_id[8], fw_id[9], fw_id[10], fw_id[11]);
+	if(g_fw_id[0]==0x97&&g_fw_id[1]==0x31&&g_fw_id[2]==0x30&&g_fw_id[3]==0x38)
+		return sprintf(buf, "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x\n", g_fw_id[0], g_fw_id[1], g_fw_id[2], g_fw_id[3], g_fw_id[4], g_fw_id[5], g_fw_id[6], g_fw_id[7], g_fw_id[8], g_fw_id[9], g_fw_id[10], g_fw_id[11]);
 
 	if(ts_bak){
 		while (retry != 0){
 			ret = get_fw_id(ts_bak->client, fw_id);
 		
 			if(ret < 0){
-				sis_debug(NO_DEBUG, "[Touch_sis] sis_show_full_fw_id: Failed to read FW ID, retry = %d\n", (6-retry));
+				sis_debug(NO_DEBUG, "[Touch_sis] sis_show_full_fw_id: Failed to read FW ID, retry = %d\n", (16-retry));
 			}else {
-				if(wakeUpTouchCount < 2){
-					wakeUpTouchCount++;
-				}else {
-					sis_debug(DEBUG_POWER, "[Touch_sis] sis_show_full_fw_id:#%d  %02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x\n", wakeUpTouchCount, fw_id[0], fw_id[1], fw_id[2], fw_id[3], fw_id[4], fw_id[5], fw_id[6], fw_id[7], fw_id[8], fw_id[9], fw_id[10], fw_id[11]);
+				sis_debug(DEBUG_POWER, "[Touch_sis] sis_show_full_fw_id:#%d  %02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x\n", (16-retry), fw_id[0], fw_id[1], fw_id[2], fw_id[3], fw_id[4], fw_id[5], fw_id[6], fw_id[7], fw_id[8], fw_id[9], fw_id[10], fw_id[11]);
+
+				if(fw_id[0]==0x97&&fw_id[1]==0x31&&fw_id[2]==0x30&&fw_id[3]==0x38)
 					break;
-				}
 			}	
-			msleep(10);
+			msleep(300);
 			retry--;
 		}
 	}
@@ -1525,29 +1520,25 @@ static ssize_t sis_show_full_fw_id(struct device *dev, struct device_attribute *
 
 static ssize_t sis_show_boot_flag(struct device *dev, struct device_attribute *devattr,char *buf)
 {
-	uint8_t boot_flag[4];
-	int i = 0, ret = 0, retry = 5, wakeUpTouchCount = 0;
+	uint8_t boot_flag[4] = {0xff,0xff,0xff,0xff};
+	int ret = 0, retry = 15;
 
-	for(i = 0; i < 4; i++){
-		boot_flag[i] = g_boot_flag[i];
-	}
-	//sis_debug(DEBUG_POWER, "[Touch_sis] sis_show_boot_flag: default buf: %02x%02x%02x%02x\n", boot_flag[0], boot_flag[1], boot_flag[2], boot_flag[3]);
+	if(g_boot_flag[0]==0x50&&g_boot_flag[1]==0x38&&g_boot_flag[2]==0x31&&g_boot_flag[3]==0x30)
+		return sprintf(buf, "%02x%02x%02x%02x\n", g_boot_flag[0], g_boot_flag[1], g_boot_flag[2], g_boot_flag[3]);
 
 	if(ts_bak){
 		while (retry != 0){
 			ret = get_boot_flag(ts_bak->client, boot_flag);
 	
 			if(ret < 0){
-				sis_debug(NO_DEBUG, "[Touch_sis] sis_show_boot_flag: Failed to read Boot Flag, retry = %d\n", (6-retry));
+				sis_debug(NO_DEBUG, "[Touch_sis] sis_show_boot_flag:#%d Failed to read Boot Flag\n", (16-retry));
 			}else {
-				if(wakeUpTouchCount < 2){
-					wakeUpTouchCount++;
-				}else {
-					sis_debug(DEBUG_POWER, "[Touch_sis] sis_show_boot_flag:#%d %02x%02x%02x%02x\n", wakeUpTouchCount, boot_flag[0], boot_flag[1], boot_flag[2], boot_flag[3]);
+				sis_debug(DEBUG_POWER, "[Touch_sis] sis_show_boot_flag:#%d %02x%02x%02x%02x\n", (16-retry), boot_flag[0], boot_flag[1], boot_flag[2], boot_flag[3]);
+
+				if(boot_flag[0]==0x50&&boot_flag[1]==0x38&&boot_flag[2]==0x31&&boot_flag[3]==0x30)
 					break;
-				}
 			}
-			msleep(10);
+			msleep(300);
 			retry--;
 		}
 	}
@@ -2120,6 +2111,7 @@ static int sis_ts_suspend(struct i2c_client *client, pm_message_t mesg)
 {
 	if(g_bIsPadAttach){
 		sis_debug(DEBUG_POWER, "[Touch_sis] suspend\n");
+
 #ifdef CONFIG_EEPROM_NUVOTON
 		AX_MicroP_setGPIOOutputPin(OUT_uP_TS_RST_R, 0);
 #endif //CONFIG_EEPROM_NUVOTON
@@ -2131,15 +2123,10 @@ static int sis_ts_resume(struct i2c_client *client)
 {
 	if(g_bIsPadAttach){
 		sis_debug(DEBUG_POWER, "[Touch_sis] resume\n");
+
+		queue_delayed_work(g_wq_check_touch, &g_resume_work, 0);
 		queue_delayed_work(g_wq_check_touch, &g_check_touch_work, 100);
-#ifdef CONFIG_EEPROM_NUVOTON
-		AX_MicroP_setGPIOOutputPin(OUT_uP_TS_RST_R, 1);
-		msleep(20);
-		AX_MicroP_setGPIOOutputPin(OUT_uP_TS_RST_R, 0);
-		msleep(20);
-		AX_MicroP_setGPIOOutputPin(OUT_uP_TS_RST_R, 1);
-		msleep(20);
-#endif //CONFIG_EEPROM_NUVOTON
+
 		g_bIsSleep = false;
 	}
 	return 0;
@@ -2407,6 +2394,7 @@ static int __devinit sis_ts_init(void)
 	}
 
 	INIT_DELAYED_WORK(&g_check_touch_work, check_touch_fw_work);
+	INIT_DELAYED_WORK(&g_resume_work, resume_work);
 	
 #ifdef CONFIG_EEPROM_NUVOTON
 	INIT_WORK(&g_mp_attach_work, attach_padstation_work);
@@ -2464,6 +2452,18 @@ module_init(sis_ts_init);
 module_exit(sis_ts_exit);
 
 //Desmond++
+static void resume_work(struct work_struct *work)
+{
+#ifdef CONFIG_EEPROM_NUVOTON
+	AX_MicroP_setGPIOOutputPin(OUT_uP_TS_RST_R, 1);
+	msleep(20);
+	AX_MicroP_setGPIOOutputPin(OUT_uP_TS_RST_R, 0);
+	msleep(20);
+	AX_MicroP_setGPIOOutputPin(OUT_uP_TS_RST_R, 1);
+	msleep(20);
+#endif //CONFIG_EEPROM_NUVOTON
+}
+
 static void check_touch_fw_work(struct work_struct *work)
 {
 	int ret = 0, retry = 5;

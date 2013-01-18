@@ -541,6 +541,9 @@ static int mmc_read_ext_csd(struct mmc_card *card, u8 *ext_csd)
 			 */
 			card->ext_csd.out_of_int_time =
 				ext_csd[EXT_CSD_OUT_OF_INTERRUPT_TIME] * 10;
+//josh++
+			pr_info("%s, hpi_cmd:%d, max timeout of HPI: %d\n", mmc_hostname(card->host), card->ext_csd.hpi_cmd, card->ext_csd.out_of_int_time); //josh++
+//josh--
 		}
 
 		card->ext_csd.rel_param = ext_csd[EXT_CSD_WR_REL_PARAM];
@@ -1614,6 +1617,16 @@ static int mmc_awake(struct mmc_host *host)
 				err = mmc_awake_again(host);
 //ASUS_BSP --- Josh_Liao "workaround to make card always has response after resume"
 		}
+
+//ASUS_BSP +++ Josh_Liao "always use CMD12 by set hpi en after awake cmd"
+		err = mmc_switch(host->card, EXT_CSD_CMD_SET_NORMAL,
+				EXT_CSD_HPI_MGMT, 1,
+				host->card->ext_csd.generic_cmd6_time);
+		if (err < 0) {
+			pr_err("%s: Error %d while set hpi_en[161]\n",
+				 mmc_hostname(host), err);			
+		}
+//ASUS_BSP --- Josh_Liao "always use CMD12 by set hpi en after awake cmd"
 	}
 
 	return err;

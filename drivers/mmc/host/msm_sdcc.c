@@ -4713,9 +4713,6 @@ static void msmsdcc_early_suspend(struct early_suspend *h)
 	spin_lock_irqsave(&host->lock, flags);
 	host->polling_enabled = host->mmc->caps & MMC_CAP_NEEDS_POLL;
 	host->mmc->caps &= ~MMC_CAP_NEEDS_POLL;
-//ASUS_BSP +++ Josh_Liao "Temporarily disable BKOPS during suspend to avoid DPM device timeout"
-	host->mmc->caps2 &= ~MMC_CAP2_BKOPS;
-//ASUS_BSP --- Josh_Liao "Temporarily disable BKOPS during suspend to avoid DPM device timeout"
 	spin_unlock_irqrestore(&host->lock, flags);
 };
 static void msmsdcc_late_resume(struct early_suspend *h)
@@ -4724,11 +4721,6 @@ static void msmsdcc_late_resume(struct early_suspend *h)
 		container_of(h, struct msmsdcc_host, early_suspend);
 	unsigned long flags;
 
-//ASUS_BSP +++ Josh_Liao "Temporarily disable BKOPS during suspend to avoid DPM device timeout"
-	spin_lock_irqsave(&host->lock, flags);
-	host->mmc->caps2 |= MMC_CAP2_BKOPS;
-	spin_unlock_irqrestore(&host->lock, flags);
-//ASUS_BSP --- Josh_Liao "Temporarily disable BKOPS during suspend to avoid DPM device timeout"
 	if (host->polling_enabled) {
 		spin_lock_irqsave(&host->lock, flags);
 		host->mmc->caps |= MMC_CAP_NEEDS_POLL;

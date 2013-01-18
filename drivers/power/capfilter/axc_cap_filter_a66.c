@@ -26,6 +26,9 @@ extern int g_CapType;
 //Eason: remember last BMS Cap to filter+++
 extern int gDiff_BMS;
 //Eason: remember last BMS Cap to filter---
+//Eason:In  phone call suspend, use 200mA do fasterLeverage+++
+extern int g_flag_csvoice_fe_connected;
+//Eason:In  phone call suspend, use 200mA do fasterLeverage---
 
 
 /* eval_bat_life_when_discharging - Evaluate conservative battery life when discharging.
@@ -64,8 +67,19 @@ static int eval_bat_life_when_discharging(
 			//Eason:prevent in unattend mode mass drop+++
 			if(10==maxMah)
 			{
-				//fasterLeverage_drop_val = (200*100/batCapMah)*interval/SECOND_OF_HOUR;
-				fasterLeverage_drop_val = (30*100*100/batCapMah)*interval/SECOND_OF_HOUR/100;
+				//Eason:In  phone call suspend, use 200mA do fasterLeverage+++
+				/*
+				*	extern int g_flag_csvoice_fe_connected, 
+				*     - 0: not in phone call
+				*     - 1: in phone call
+				*/
+				if(0 == g_flag_csvoice_fe_connected)
+				{
+					fasterLeverage_drop_val = (30*100*100/batCapMah)*interval/SECOND_OF_HOUR/100;
+				}else{
+					fasterLeverage_drop_val = (200*100*100/batCapMah)*interval/SECOND_OF_HOUR/100;
+				}
+				//Eason:In  phone call suspend, use 200mA do fasterLeverage---
 			}
 			//Eason:prevent in unattend mode mass drop---
 			/* variable drop base for faster leverage true batter life */
