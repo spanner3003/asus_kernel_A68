@@ -1735,8 +1735,18 @@ static int get_adc_calibrated_lux_from_cm36283(void)
 
 	steps = g_cm36283_light;			// will compare with g_light_level and get the Lux
 	g_cm36283_light_adc = steps;     	// adc is the value that is returned from HW directly ( Original adb number )
-
+	
 	steps = (u32)(steps * g_cm36283_light_calibration_fval_x1000 / 100  + g_cm36283_light_shift_calibration);     //apply calibration value ( Because the panel level, calibration number probably over 10000)
+
+	/*Fix calibration error for Lux*/
+	if ( g_cm36283_light_shift_calibration > 50 )	{
+		printk("[cm36283][als] Shift calibration value probably overflow\n");
+		if ( g_cm36283_light_adc * g_cm36283_light_calibration_fval_x1000 / 100 <= 3 )
+			steps = 0;
+	}else	{
+		if ( g_cm36283_light_adc <= 3 )
+			steps = 0;
+	}
 
 	g_cm36283_light_k_adc = steps;
 	printk(DBGMSK_PRX_G3"[cm36283][als] read adc: %d, cal adc: %d, file adc: %d\n", g_cm36283_light, g_cm36283_light_k_adc, g_cm36283_light_adc);
@@ -1768,6 +1778,11 @@ static int get_adc_calibrated_lux_from_cm36283(void)
 	}
 	if ( g_cm36283_light > g_cm36283_light_map[ g_max_light_level -1 ])
 		g_cm36283_light = g_cm36283_light_map[ g_max_light_level -1 ];
+
+	/*Fix calibration error for threshold*/
+	if ( g_cm36283_light > 0 && level <=0 )
+		level = 1;		
+	
 	printk(DBGMSK_PRX_G3"[cm36283][als] last=%d light=%d steps=%d i=%d\n", g_last_cm36283_light, g_cm36283_light, g_cm36283_light_map[i], level);
 
 #ifndef INTERNAL_TEST

@@ -113,6 +113,11 @@ static irqreturn_t msm_ebi_irq(int irq, void *dev_id)
 	err_cntl |= CNTL_CLEAR_ERR;
 	writel_relaxed(err_cntl, base + SLV_ERR_CNTL);
 	mb();	/* Ensure interrupt is cleared before returning */
+	//ASUS_BSP+++ "[EBI][NA][DEBUG] dump stack when EBI error detected"
+	#ifndef ASUS_SHIP_BUILD
+	dump_stack();
+	#endif
+	//ASUS_BSP--- "[EBI][NA][DEBUG] dump stack when EBI error detected"
 	return IRQ_HANDLED;
 }
 

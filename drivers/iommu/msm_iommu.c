@@ -942,7 +942,10 @@ static int msm_iommu_domain_has_cap(struct iommu_domain *domain,
 {
 	return 0;
 }
-
+//Mickey+++
+int debug_iommu_commit_index = 0;
+int debug_iommu_fbnum = 0;
+//Mickey---
 static void print_ctx_regs(void __iomem *base, int ctx)
 {
 	unsigned int fsr = GET_FSR(base, ctx);
@@ -968,6 +971,7 @@ static void print_ctx_regs(void __iomem *base, int ctx)
 	       GET_SCTLR(base, ctx), GET_ACTLR(base, ctx));
 	pr_err("PRRR   = %08x    NMRR   = %08x\n",
 	       GET_PRRR(base, ctx), GET_NMRR(base, ctx));
+    pr_err("M: index=%d, num=%d\n",debug_iommu_commit_index,debug_iommu_fbnum);
 }
 
 irqreturn_t msm_iommu_fault_handler(int irq, void *dev_id)

@@ -936,7 +936,7 @@ error_free_data:
  * building the PDT because the reflash might cause various registers
  * to move around.
  */
-static int do_initial_reset(struct rmi_device *rmi_dev)
+int do_initial_reset(struct rmi_device *rmi_dev)
 {
 	struct pdt_entry pdt_entry;
 	int page;
@@ -987,6 +987,7 @@ static int do_initial_reset(struct rmi_device *rmi_dev)
 	dev_warn(dev, "WARNING: Failed to find F01 for initial reset.\n");
 	return -ENODEV;
 }
+EXPORT_SYMBOL(do_initial_reset);
 
 static int rmi_scan_pdt(struct rmi_device *rmi_dev)
 {
@@ -1555,7 +1556,7 @@ static ssize_t rmi_driver_hardreset_store(struct device *dev,
        struct rmi_device *rmi_dev;
        int retval;
 
-       printk("[touch_synaptics] hardware reset!! ++\n");
+       rmi_debug(DEBUG_INFO, "[touch_synaptics] hardware reset!! ++\n");
        rmi_dev = to_rmi_device(dev);
 
        if (sscanf(buf, "%u", &reset) != 1)
@@ -1563,22 +1564,22 @@ static ssize_t rmi_driver_hardreset_store(struct device *dev,
 
        if (reset == 0 || reset == 1){
                gpio_set_value(S3202_RESET, reset);
-               printk("[touch_synaptics] set gpio S3202_RESET = %u\n", reset);
+               rmi_debug(DEBUG_VERBOSE, "[touch_synaptics] set gpio S3202_RESET = %u\n", reset);
        } else if (reset == 2 ) {
                gpio_set_value(S3202_RESET, 0);
                usleep(100000);
                gpio_set_value(S3202_RESET, 1);
                usleep(500000);
-               printk("[touch_synaptics] do hardware reset!\n");
+               rmi_debug(DEBUG_VERBOSE, "[touch_synaptics] do hardware reset!\n");
        } else if (reset == 3 ) {
                retval = do_initial_reset(rmi_dev);
                if (retval)
                    dev_warn(dev, "RMI initial reset failed! Soldiering on.\n");
        } else {
                return -EINVAL;
-               printk("[touch_synaptics] parameter error!!\n");
+               rmi_debug(DEBUG_VERBOSE, "[touch_synaptics] parameter error!!\n");
        }
-       printk("[touch_synaptics] hardware reset!! --\n");
+       rmi_debug(DEBUG_INFO, "[touch_synaptics] hardware reset!! --\n");
        return count;
 }
 //ASUS_BSP simpson: add for hardware reset ---

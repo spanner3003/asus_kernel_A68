@@ -667,6 +667,34 @@ static int pm8xxx_pwm_set_dtest(struct pwm_device *pwm, int enable)
 }
 
 /* APIs */
+
+//ASUS BSP HANS+++
+struct pwm_device *pwm_get(int pwm_id)
+{
+    struct pwm_device *pwm;
+
+    if (pwm_chip == NULL) {
+        pr_err("No pwm_chip\n");
+        return ERR_PTR(-ENODEV);
+    }
+
+    if (pwm_id >= pwm_chip->pwm_channels || pwm_id < 0) {
+        pr_err("Invalid pwm_id: %d .\n", pwm_id);
+        return ERR_PTR(-EINVAL);
+    }
+
+    mutex_lock(&pwm_chip->pwm_mutex);
+    pwm = &pwm_chip->pwm_dev[pwm_id];
+    if (!pwm->in_use) {
+        pwm = ERR_PTR(-ENODEV);
+    }
+    mutex_unlock(&pwm_chip->pwm_mutex);
+
+    return pwm;
+}
+EXPORT_SYMBOL_GPL(pwm_get);
+//ASUS BSP HANS---
+
 /**
  * pwm_request - request a PWM device
  * @pwm_id: PWM id or channel

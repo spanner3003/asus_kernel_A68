@@ -22,6 +22,8 @@ GNU General Public License for more details.
 
 // DEVCAP we will initialize to
 //MHL_CTS 20120907+++
-#define	MHL_LOGICAL_DEVICE_MAP		(MHL_DEV_LD_GUI )
+//ASUS_BSP+++ : support GUI and VIDEO profile
+#define	MHL_LOGICAL_DEVICE_MAP		(MHL_DEV_LD_GUI | MHL_DEV_LD_VIDEO)
+//ASUS_BSP--- : support GUI and VIDEO profile
 //MHL_CTS 20120907---
 

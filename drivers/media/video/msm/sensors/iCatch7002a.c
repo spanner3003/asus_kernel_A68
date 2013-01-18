@@ -136,10 +136,16 @@ static u32 single_image = 0;	//ASUS_BSP Stimber "Interface for single image"
 static bool g_TAEenable = 0;	//0: Disable, 1:Enable
 
 static int g_is_hdr_on = 0;	//0: Disable, 1:Enable //ASUS_BSP stimber "Implement HDR feature"
-static bool bFPSFix = false;	//fixed fps or not
-static bool bMaxExpTime = false;	//Max exposure time or not
 static bool  is_calibration_table_set = false;
 static bool g_isAFCancel = false;
+bool g_isAFDone = true;
+
+//ASUS_BSP +++ Stimber "Modify for preview/video frame rate"
+#define DEFAULT_SETTING 0
+static int g_LastFixFPS = 0;
+static int g_LastMaxExp = 0;
+static int g_LastMiniISO = 0;
+//ASUS_BSP --- Stimber "Modify for preview/video frame rate"
 
 struct completion g_iCatch_comp;
 static bool caf_mode = false;
@@ -228,7 +234,7 @@ int sensor_write_reg(struct i2c_client *client, u16 addr, u16 val)
 		       addr, val);
 //		pr_err("yuv_sensor : i2c transfer failed, count %x, err= 0x%x\n",
 //		       __FUNCTION__, __LINE__, msg.addr, err);
-//		msleep(3);
+		msleep(1); //LiJen: add delay to avoid ISP i2c fail issue
 	} while (retry <= SENSOR_MAX_RETRIES);
 
 	if(err == 0) {
@@ -1145,7 +1151,7 @@ static int sensor_write_reg_bytes(struct i2c_client *client, u16 addr, unsigned 
 		retry++;
 //		pr_err("yuv_sensor : i2c transfer failed, retrying %x %llu\n", addr, val);
 		pr_err("yuv_sensor : i2c transfer failed, count %x \n", msg.addr);
-	} while (retry <= SENSOR_MAX_RETRIES);
+	} while (retry <= 3);
 
 	return err;
 }
@@ -1159,6 +1165,7 @@ u32 I2C_7002DmemWr(
 	u32 i, j, bank;
        const u32 bytes = ISP_FLASH_I2C_WRITE_BYTES;
        unsigned char tmp[bytes];
+       int rc=0;
 
 	bank = 0x40+bankNum;
 	//I2CDataWrite(0x10A6,bank);
@@ -1172,7 +1179,11 @@ u32 I2C_7002DmemWr(
                     tmp[j]=(*(pbuf + i + j));
                }        
 
-              sensor_write_reg_bytes(imx091_s_ctrl.sensor_i2c_client->client, (0x1800+i), tmp, bytes);
+              rc=sensor_write_reg_bytes(imx091_s_ctrl.sensor_i2c_client->client, (0x1800+i), tmp, bytes);
+              if(rc < 0){
+                    pr_err("%s sensor_write_reg_bytes fail rc=%d\n",__func__,rc);
+                    return rc;
+              }
 	}
 
 	bank = 0x40 + ((bankNum+1)%2);
@@ -1194,6 +1205,7 @@ u32 I2C_SPIFlashWrite_DMA(
     u32 dmemBank = 0;
     u32 chk1=0;
     u16 chk2, temp = 0;
+    int rc=0;
 
     rsvSec1 = pages*pageSize - 0x7000;
     rsvSec2 = pages*pageSize - 0x1000;
@@ -1270,8 +1282,11 @@ u32 I2C_SPIFlashWrite_DMA(
 //    	I2CDataWrite(0x1084,(1<<dmemBank));
     	sensor_write_reg(imx091_s_ctrl.sensor_i2c_client->client, 0x1081,dmemBank*0x20);
     	sensor_write_reg(imx091_s_ctrl.sensor_i2c_client->client, 0x1084,(1<<dmemBank));
-    	I2C_7002DmemWr(dmemBank,pageSize,pbuf);		
-		
+    	rc=I2C_7002DmemWr(dmemBank,pageSize,pbuf);		
+       if(rc<0){
+            pr_err("%s fail\n",__func__);
+            return rc;
+       }		
      	I2C_SPIFlashWrEnable();
      	//I2CDataWrite(0x40e7,0x00);
        sensor_write_reg(imx091_s_ctrl.sensor_i2c_client->client, 0x40e7,0x00);
@@ -1626,7 +1641,11 @@ BB_WrSPIFlash(char* binfile_path)
 		}
 		#endif
 		//I2C_SPIFlashWrite(0, pages, pbootBuf);
-		I2C_SPIFlashWrite_DMA(0, pages, pbootBuf);
+		ret=I2C_SPIFlashWrite_DMA(0, pages, pbootBuf);
+                if(ret<0){
+                    printk("I2C_SPIFlashWrite_DMA fail\n");
+                    fw_update_status = ICATCH_FW_UPDATE_FAILED;
+               }
 	} else {
 		printk("type unknown: %d; Won't update iCatch FW.\n", type);
 		fw_update_status = ICATCH_FW_UPDATE_FAILED;
@@ -1790,6 +1809,26 @@ void wait_for_AE_ready(void){
     }    
 }
 
+void wait_for_AWB_ready(void){
+    u16 testval, i;
+             
+    iCatch_first_open = false;
+                
+    for (i=0;i<15;i++)
+    {
+        sensor_read_reg(imx091_s_ctrl.sensor_i2c_client->client, 0x72c3, &testval);
+        printk("testval=0x%X, i=%d\n",testval,i);
+        if (testval & 0x02) {
+            sensor_write_reg(imx091_s_ctrl.sensor_i2c_client->client, 0x72f8, 0x04);
+            sensor_read_reg(imx091_s_ctrl.sensor_i2c_client->client, 0x72f8, &testval);
+            printk("Clear testval=0x%X, i=%d\n",testval,i);
+            break;
+        }
+        //printk("testval=0x%X, i=%d\n",testval,i);
+        msleep(20);
+    }
+}
+
 void enable_isp_interrupt(void){
     //Mask ISP interrupt
     sensor_write_reg(imx091_s_ctrl.sensor_i2c_client->client, 0x72fc, 0x04);
@@ -1807,6 +1846,77 @@ void set_isp_calibration_table(int table){
     }
 }
 
+//ASUS_BSP +++ Stimber "Modify for preview/video frame rate"
+void setFixFPS(int settingVal)
+{
+    int default_value = 0x00;
+    
+    if (settingVal == DEFAULT_SETTING) { //restore to default value
+        if (g_LastFixFPS != DEFAULT_SETTING) { // Need to restore
+            sensor_write_reg(imx091_s_ctrl.sensor_i2c_client->client, 0x7124, default_value);    // clear to restore
+            g_LastFixFPS = DEFAULT_SETTING;
+        } //else: regValue==g_LastMiniISO==default value : do nothing
+    } else {
+        sensor_write_reg(imx091_s_ctrl.sensor_i2c_client->client, 0x7124, settingVal);
+        g_LastFixFPS = settingVal;
+    }
+}
+
+void setMaxExp(int settingVal)
+{
+    int default_value = 0x00;
+    
+    if (settingVal == DEFAULT_SETTING) { //restore to default value
+        if (g_LastMaxExp != DEFAULT_SETTING) { // Need to restore
+            sensor_write_reg(imx091_s_ctrl.sensor_i2c_client->client, 0x7125, default_value);    // clear to restore
+            g_LastMaxExp = DEFAULT_SETTING;
+        } //else: regValue==g_LastMiniISO==default value : do nothing
+    } else {
+        sensor_write_reg(imx091_s_ctrl.sensor_i2c_client->client, 0x7125, settingVal);
+        g_LastMaxExp = settingVal;
+    }
+}
+
+void setMiniISO(int settingVal)
+{
+    int default_value = 0x00;
+    int reg_val = 0x00;
+    
+    if (settingVal == DEFAULT_SETTING) { //restore to default value
+        if (g_LastMiniISO != DEFAULT_SETTING) { // Need to restore
+            sensor_write_reg(imx091_s_ctrl.sensor_i2c_client->client, 0x7129, default_value);    // clear to restore
+            g_LastMiniISO = DEFAULT_SETTING;
+        } //else: regValue==g_LastMiniISO==default value : do nothing
+    } else {
+        switch(settingVal){
+            case 50:
+                reg_val = 0x01;
+                break;
+            case 100:
+                reg_val = 0x02;
+                break;
+            case 200:
+                reg_val = 0x03;
+                break;
+            case 400:
+                reg_val = 0x04;
+                break;
+            case 800:
+                reg_val = 0x05;
+                break;
+            case 1600:
+                reg_val = 0x06;
+                break;
+            default:
+                reg_val = 0x00;
+                break;
+        }
+        sensor_write_reg(imx091_s_ctrl.sensor_i2c_client->client, 0x7129, reg_val);
+        g_LastMiniISO = settingVal;
+    }
+}
+//ASUS_BSP --- Stimber "Modify for preview/video frame rate"
+
 int sensor_set_mode(int  res)
 {
        //burst capture abort
@@ -1817,81 +1927,93 @@ int sensor_set_mode(int  res)
              sensor_write_reg(imx091_s_ctrl.sensor_i2c_client->client, 0x7122, 0x01);
        }
 
-	   if(bMaxExpTime == true){	
-	   		pr_info("Force to disable Max. Exposure Time\n");
-			sensor_write_reg(imx091_s_ctrl.sensor_i2c_client->client, 0x7125, 0x00);//disable Max. Exposure Time function
-			bMaxExpTime = false;
-	   }
-
        switch(res){
             case MSM_SENSOR_RES_QTR:            //MODE_1
                 pr_info("%s: MODE_1\n",__func__);
 
                 //LiJen: Workaround: ignore MODE_7->MODE_1 interrupt. 
                 if((g_pre_res == MSM_SENSOR_RES_FULL_SINGLE_CAPTURE)){
-                    INIT_COMPLETION(g_iCatch_comp);
                     sensor_write_reg(imx091_s_ctrl.sensor_i2c_client->client, 0x72f8, 0x04);
+                    INIT_COMPLETION(g_iCatch_comp);
                     pr_info("%s INIT_COMPLETION\n",__func__);
                 }
                 
+                setFixFPS(0);
+                setMaxExp(30);
+                setMiniISO(0);
+                
                 sensor_write_reg(imx091_s_ctrl.sensor_i2c_client->client, 0x7106, 0x06);//preview resolution
                 sensor_write_reg(imx091_s_ctrl.sensor_i2c_client->client, 0x7120, 0x00);//swtich preview mode  
-                
-                //sensor_write_reg(imx091_s_ctrl.sensor_i2c_client->client, 0x7124, 30);//fixed fps
-                //bFPSFix = true;
+
                 break;
             case MSM_SENSOR_RES_4BIN:           //MODE_2
                 pr_info("%s: MODE_2\n",__func__);
+
+                setFixFPS(0);
+                setMaxExp(30);
+                setMiniISO(400);
+                
                 sensor_write_reg(imx091_s_ctrl.sensor_i2c_client->client, 0x7106, 0x05);//preview resolution
                 sensor_write_reg(imx091_s_ctrl.sensor_i2c_client->client, 0x7120, 0x00);//swtich preview mode 
-
-                if(bFPSFix == true){
-                    sensor_write_reg(imx091_s_ctrl.sensor_i2c_client->client, 0x7124, 0);//fixed fps
-                    bFPSFix = false;
-                }
+                
                 break;
             case MSM_SENSOR_RES_FULL_HD:    //MODE_3
                 pr_info("%s: MODE_3\n",__func__);
+
+                setFixFPS(0);
+                setMaxExp(30);
+                setMiniISO(400);
+                
                 sensor_write_reg(imx091_s_ctrl.sensor_i2c_client->client, 0x7106, 0x02);//preview resolution
                 sensor_write_reg(imx091_s_ctrl.sensor_i2c_client->client, 0x7120, 0x00);//swtich preview mode 
 
-                if(bFPSFix == true){
-                    sensor_write_reg(imx091_s_ctrl.sensor_i2c_client->client, 0x7124, 0);//fixed fps
-                    bFPSFix = false;
-                }
                 break;
             case MSM_SENSOR_RES_FULL:           //MODE_4
                 pr_info("%s: MODE_4\n",__func__);
-	         sensor_write_reg(imx091_s_ctrl.sensor_i2c_client->client, 0x7106, 0x08);//preview resolution
-	         sensor_write_reg(imx091_s_ctrl.sensor_i2c_client->client, 0x7120, 0x00);//swtich preview mode          
 
-	         if(bFPSFix == true){
-	              sensor_write_reg(imx091_s_ctrl.sensor_i2c_client->client, 0x7124, 0);//fixed fps
-	              bFPSFix = false;
-	         }
-		
+                setFixFPS(0);
+                setMaxExp(0);
+                setMiniISO(0);
+                
+	            sensor_write_reg(imx091_s_ctrl.sensor_i2c_client->client, 0x7106, 0x08);//preview resolution
+	            sensor_write_reg(imx091_s_ctrl.sensor_i2c_client->client, 0x7120, 0x00);//swtich preview mode          
+
                 break;
             case MSM_SENSOR_RES_10M:            //MODE_5
-		  pr_info("%s: MODE_5\n",__func__);
+		        pr_info("%s: MODE_5\n",__func__);
+
+                setFixFPS(0);
+                setMaxExp(0);
+                setMiniISO(0);
+                
                 sensor_write_reg(imx091_s_ctrl.sensor_i2c_client->client, 0x7106, 0x07);//preview resolution
                 sensor_write_reg(imx091_s_ctrl.sensor_i2c_client->client, 0x7120, 0x00);//swtich preview mode              
-
-                if(bFPSFix == true){
-                    sensor_write_reg(imx091_s_ctrl.sensor_i2c_client->client, 0x7124, 0);//fixed fps
-                    bFPSFix = false;
-                }
-			
+        
                 break;
             case MSM_SENSOR_RES_HYBRID:     //MODE_6
                 pr_info("%s: MODE_6\n",__func__);
+                
+                setFixFPS(24);
+                setMaxExp(0);
+                setMiniISO(0);
+                
                 sensor_write_reg(imx091_s_ctrl.sensor_i2c_client->client, 0x7106, 0x09);//preview resolution
                 sensor_write_reg(imx091_s_ctrl.sensor_i2c_client->client, 0x7120, 0x00);//swtich preview mode
-                
-                //sensor_write_reg(imx091_s_ctrl.sensor_i2c_client->client, 0x7124, 24);//fixed fps
-                //bFPSFix = true;
+                              
                 break;
             case MSM_SENSOR_RES_FULL_SINGLE_CAPTURE:    //MODE_7
                 pr_info("%s: MODE_7\n",__func__);
+                //LiJen: Workaround: ignore MODE_1->MODE_7 interrupt. 
+                if((g_pre_res == MSM_SENSOR_RES_QTR)){
+                    sensor_write_reg(imx091_s_ctrl.sensor_i2c_client->client, 0x72f8, 0x04);
+                    INIT_COMPLETION(g_iCatch_comp);
+                    pr_info("%s INIT_COMPLETION\n",__func__);
+                }         
+
+                setFixFPS(0);
+                setMaxExp(0);
+                setMiniISO(0);
+                    
                 if(g_is_hdr_on){ //HDR
                     pr_info("[Camera] HDR mode\n");
 		      sensor_write_reg(imx091_s_ctrl.sensor_i2c_client->client, 0x7127, 0x15);//HDR posotive +1.5EV
@@ -1907,14 +2029,15 @@ int sensor_set_mode(int  res)
                      	sensor_write_reg(imx091_s_ctrl.sensor_i2c_client->client, 0x7120, 0x03);//swtich capture flash mode
                      }
                 }       
-
-                if(bFPSFix == true){
-                    sensor_write_reg(imx091_s_ctrl.sensor_i2c_client->client, 0x7124, 0);//fixed fps
-                    bFPSFix = false;
-                }
+           
                 break;
             case MSM_SENSOR_RES_FULL_BURST_CAPTURE:    //MODE_8
                 pr_info("%s: MODE_8\n",__func__);
+
+                setFixFPS(0);
+                setMaxExp(0);
+                setMiniISO(0);
+                
                 sensor_write_reg(imx091_s_ctrl.sensor_i2c_client->client, 0x710f, 0x03);//swtich burst capture mode
                      if(MSM_SENSOR_RES_FULL == g_pre_res){
                      	sensor_write_reg(imx091_s_ctrl.sensor_i2c_client->client, 0x7120, 0x02);//swtich capture flash mode
@@ -1922,21 +2045,17 @@ int sensor_set_mode(int  res)
                      	sensor_write_reg(imx091_s_ctrl.sensor_i2c_client->client, 0x7120, 0x03);//swtich capture flash mode
                      }                   
 
-                if(bFPSFix == true){
-                    sensor_write_reg(imx091_s_ctrl.sensor_i2c_client->client, 0x7124, 0);//fixed fps
-                    bFPSFix = false;
-                }
                 break;
             case MSM_SENSOR_RES_10M_BURST_CAPTURE:    //MODE_10
                 pr_info("%s: MODE_10\n",__func__);
+
+                setFixFPS(0);
+                setMaxExp(0);
+                setMiniISO(0);
+                
                 sensor_write_reg(imx091_s_ctrl.sensor_i2c_client->client, 0x710f, 0x03);//swtich burst capture mode
                 sensor_write_reg(imx091_s_ctrl.sensor_i2c_client->client, 0x7120, 0x02);//swtich capture flash mode  
 
-                if(bFPSFix == true){
-                    sensor_write_reg(imx091_s_ctrl.sensor_i2c_client->client, 0x7124, 0);//fixed fps
-                    bFPSFix = false;
-                }
-		  
                 break;                
             default:
                 pr_err("%s: not support resolution res %d\n",__func__, res);
@@ -3312,6 +3431,7 @@ void iCatch_wait_AF_done(void){
         u16 status;
 			
         //Wait AF interrupt
+        g_isAFDone = false;
         do{
                 mutex_unlock(imx091_s_ctrl.msm_sensor_mutex);
                 if(retry==0){
@@ -3328,7 +3448,8 @@ void iCatch_wait_AF_done(void){
                  sensor_read_reg(imx091_s_ctrl.sensor_i2c_client->client, 0x72a0, &status);
                  pr_info("status=0x%X, retry=%d\n",status,retry);
                  retry += 1;
-        } while((status != 0x00) && (retry < 135));            
+        } while((status != 0x00) && (retry < 135));    
+        g_isAFDone = true;
 }
 
 void iCatch_start_AF(bool on, isp3a_af_mode_t mode, int16_t coordinate_x, int16_t coordinate_y, int16_t rectangle_h, int16_t rectangle_w)
@@ -3797,12 +3918,10 @@ void iCatch_set_general_cmd(struct general_cmd_cfg *cmd)
 		case GENERAL_CMD_GYRO:	
                     if(cmd->cmd_value == 1){    // GRYO detect Moving
                         //sensor_write_reg(imx091_s_ctrl.sensor_i2c_client->client, 0x7126, 0x01);
-                        sensor_write_reg(imx091_s_ctrl.sensor_i2c_client->client, 0x7125, 0x60);//set Preview Max. Exposure Time as 1/60
-						bMaxExpTime = true;
+                        setMaxExp(60);//set Preview Max. Exposure Time as 1/60
 					}else{                                  // GYRO detect Stop
                         //sensor_write_reg(imx091_s_ctrl.sensor_i2c_client->client, 0x7126, 0x00);
-                        sensor_write_reg(imx091_s_ctrl.sensor_i2c_client->client, 0x7125, 0x00);//disable Max. Exposure Time function
-						bMaxExpTime = false;
+                        setMaxExp(0);//disable Max. Exposure Time function
 					}
                     break;
 		case GENERAL_CMD_TAE:	
@@ -3816,12 +3935,14 @@ void iCatch_set_general_cmd(struct general_cmd_cfg *cmd)
 		case GENERAL_CMD_FIX_FPS:	//ASUS_BSP Stimber "Implement fixed fps for video"
 			if(cmd->cmd_value){
 				pr_info("Fixed fps\n");
-				sensor_write_reg(imx091_s_ctrl.sensor_i2c_client->client, 0x7124, 30);//fixed fps
-				bFPSFix = true;
+				setFixFPS(30);  //fix 30 fps
+                setMaxExp(0);   //reset max exp.
+                setMiniISO(0);  //reset min iso to default
 			}else{
 				pr_info("Dynamic fps\n");
-				sensor_write_reg(imx091_s_ctrl.sensor_i2c_client->client, 0x7124, 0);
-				bFPSFix = false;
+				setFixFPS(0);   //reset fps fix
+                setMaxExp(30);  //set max exp. to 1/30
+                setMiniISO(0);  //reset min iso to default
 			}
 			break;
 		default:
@@ -3931,16 +4052,18 @@ void iCatch_init(void)
     single_image = 0;
     g_TAEenable = 0;
     g_is_hdr_on = 0;	//0: Disable, 1:Enable //ASUS_BSP stimber "Implement HDR feature"
-    bFPSFix = false;	//fixed fps or not
-    bMaxExpTime = false;	//Max exposure time or not
     is_calibration_table_set = false;    
     g_isAFCancel = false;
+    g_isAFDone = true;
+    g_LastFixFPS = 0;
+    g_LastMaxExp = 0;
+    g_LastMiniISO = 0;
 }
 
 void iCatch_release_sensor(void)
 {    
        //set lens to 120 step. step range is [0-1023]
-       sensor_write_reg(imx091_s_ctrl.sensor_i2c_client->client, 0x715c, 0x78);
+       sensor_write_reg(imx091_s_ctrl.sensor_i2c_client->client, 0x715c, 0x0a);
        //triger lens to move
        sensor_write_reg(imx091_s_ctrl.sensor_i2c_client->client, 0x715d, 0x00);
        //wait lens to move

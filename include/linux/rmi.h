@@ -39,6 +39,26 @@
 #include <linux/earlysuspend.h>
 #endif
 
+//ASUS_BSP simpson: add for debug mask ++
+#include <linux/module.h>
+/* Debug levels */
+#define NO_DEBUG       0
+#define DEBUG_POWER     1
+#define DEBUG_INFO  2
+#define DEBUG_VERBOSE 5
+#define DEBUG_RAW      8
+#define DEBUG_TRACE   10
+
+static int debug = DEBUG_INFO;
+
+module_param(debug, int, 0644);
+
+MODULE_PARM_DESC(debug, "Activate debugging output");
+
+#define rmi_debug(level, ...) \
+		if (debug >= (level)) \
+			pr_info(__VA_ARGS__);
+//ASUS_BSP simpson: add for debug mask --
 
 /* Permissions for sysfs attributes.  Since the permissions policy will change
  * on a global basis in the future, rather than edit all sysfs attrs everywhere

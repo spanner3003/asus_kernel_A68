@@ -26,7 +26,7 @@
 #define SEQ_WRITE_START         6
 #define SEQ_WRITE_END           7
 
-#define SENSOR_MAX_RETRIES      3 /* max counter for retry I2C access */
+#define SENSOR_MAX_RETRIES      50 /* max counter for retry I2C access */
 #define MAX_FACEDETECT_WINDOWS  5
 
 #define SENSOR_IOCTL_SET_MODE           _IOW('o', 1, struct sensor_mode)

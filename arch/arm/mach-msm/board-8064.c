@@ -123,7 +123,7 @@ struct smb346_platform_data{
 #define HOLE_SIZE		0x20000
 #define MSM_PMEM_KERNEL_EBI1_SIZE  0x65000
 #ifdef CONFIG_MSM_IOMMU
-#define MSM_ION_MM_SIZE		0x3800000
+#define MSM_ION_MM_SIZE		0x6000000 // CC: change from 0x3800000(56MB) to 96 MB
 #define MSM_ION_SF_SIZE		0
 #define MSM_ION_QSECOM_SIZE	0x780000 /* (7.5MB) */
 #define MSM_ION_HEAP_NUM	7
@@ -3553,6 +3553,7 @@ static void __init register_sensor_devices(void)
             case A68_PR:
             case A68_MP:
             case A68_PR2:
+            case A68_CD:
                 printk("ami306 on i2c-1\n");
                 apq8064_sensor_devices[1].bus = APQ_8064_GSBI2_QUP_I2C_BUS_ID;  //compass use i2c-1
                 break;
@@ -3745,6 +3746,7 @@ static int sensor_platform_init(void)
         case A68_PR:
         case A68_MP:
         case A68_PR2:
+        case A68_CD:
             printk("apply A68 SR1_1 sensor GPIO\n");
             ecompass_gpio = A68_ECOM_GPIO_IRQ_AMI306_SR1_1;
             gyro_gpio = A68_GYRO_GPIO_IRQ_MPU6050_SR1_1;
@@ -3879,6 +3881,7 @@ static void apq8064_mpuirq_init(void)
         case A68_PR:
         case A68_MP:
         case A68_PR2:
+        case A68_CD:
             printk("apply A68 SR1_1 orientation\n");
             memcpy( mpu_6050_data.orientation, orientationGyroEP_SR1_1, sizeof(mpu_6050_data.orientation));
             memcpy( inv_mpu_ami306_data.orientation, orientationMagEP_SR1_1, sizeof(inv_mpu_ami306_data.orientation));

@@ -1116,6 +1116,10 @@ done:
 	return ret;
 }
 
+//ASUS joy_Lin +++PetWatchDog Before KGSL dump and recover
+extern void pet_watchdog(void); 
+//ASUS joy_Lin ---PetWatchDog Before KGSL dump and recover 
+
 int
 adreno_dump_and_recover(struct kgsl_device *device)
 {
@@ -1141,6 +1145,11 @@ adreno_dump_and_recover(struct kgsl_device *device)
 		 * Trigger an automatic dump of the state to
 		 * the console
 		 */
+
+		//ASUS joy_Lin +++PetWatchDog Before KGSL dump and recover 
+		pet_watchdog(); 
+		//ASUS joy_Lin ---PetWatchDog Before KGSL dump and recover
+
 		adreno_postmortem_dump(device, 0);
 
 		/*
@@ -1675,6 +1684,9 @@ unsigned int adreno_hang_detect(struct kgsl_device *device,
 	unsigned int i;
 
 	if (!adreno_dev->fast_hang_detect)
+		return 0;
+	
+	if (device->ftbl->isidle(device))
 		return 0;
 
 	for (i = 0; i < hang_detect_regs_count; i++) {

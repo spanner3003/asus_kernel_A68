@@ -18,6 +18,7 @@ unsigned int get_fw_version_in_isp(void);
 void create_iCatch_proc_file(void);
 void iCatch_init(void);
 void iCatch_release_sensor(void);
+void wait_for_AWB_ready(void);
 
 void iCatch_start_AF(bool on, isp3a_af_mode_t mode, int16_t coordinate_x, int16_t coordinate_y, int16_t rectangle_h, int16_t rectangle_w);
 uint16_t iCatch_get_AF_result(struct msm_sensor_ctrl_t *s_ctrl);

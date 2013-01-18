@@ -408,35 +408,51 @@ static const struct file_operations debug_AVI_fops = {
 //Larry debug#1080p , color issue,  not sure to fix +++
 void toggletxoutput_on(void)
 {
+	      printk(("##toggletxoutput_on +++\n"));
+
 		if (fwPowerState == POWER_STATE_D3)
 		{
 			printk("power state D3, By pass toggletxoutput_on\n");
 			return;
 		}
-	      TX_DEBUG_PRINT(("toggletxoutput_on +++\n"));
+
+		if ((!packedPixelStatus) && (g_pad_tv_mode == MHL_TV_MODE)) 
+		{
+	      		printk(("toggletxoutput_on (1)\n"));
+		
+			SiiRegWrite(REG_VID_MODE, 0x12);  // KH, Enable Demuxing data
+			printk("[toggletxoutput_on], Enable Demuxing data\n");
+			SiiRegWrite(REG_VID_MODE, 0x00);  // KH, Disable Demuxing data
+			printk("[toggletxoutput_on], Disable Demuxing data\n");
+			MHL_Resume = true;
+		}
+
+	      printk(("toggletxoutput_on (2)\n"));
 
             SiiRegModify(TPI_SYSTEM_CONTROL_DATA_REG,
 				TMDS_OUTPUT_CONTROL_MASK,
 				TMDS_OUTPUT_CONTROL_ACTIVE);
 			
-	      TX_DEBUG_PRINT(("toggletxoutput_on ---\n"));
+	      printk(("toggletxoutput_on ---\n"));
 }
 
 void toggletxoutput_off(void)
 {
+	      printk(("toggletxoutput_off +++\n"));
+
 		if (fwPowerState == POWER_STATE_D3)
 		{
 			printk("power state D3, By pass toggletxoutput_off\n");
 			return;
 		}
 
-	      TX_DEBUG_PRINT(("toggletxoutput_off +++\n"));
+	      printk(("toggletxoutput_off TPI power down\n"));
 		  
             SiiRegModify(TPI_SYSTEM_CONTROL_DATA_REG,
 				TMDS_OUTPUT_CONTROL_MASK,
 				TMDS_OUTPUT_CONTROL_POWER_DOWN);
 					
-	      TX_DEBUG_PRINT(("toggletxoutput_off ---\n"));
+	      printk(("toggletxoutput_off ---\n"));
 }
 //Larry debug#1080p , color issue,  not sure to fix ---
 
@@ -1448,6 +1464,14 @@ void	SiiAnyPollingDebug( void )
 int CarKitInitialize(void)	
 {
        int ret=0;
+
+#ifdef CONFIG_DEBUG_FS
+       debugfs_create_file("sii8240", S_IRUGO, NULL, NULL, &debug_fops);
+       debugfs_create_file("sii8240_tpi_on", S_IRUGO, NULL, NULL, &debug_TPISysCtrl_on_fops);
+       debugfs_create_file("sii8240_tpi_off", S_IRUGO, NULL, NULL, &debug_TPISysCtrl_off_fops);
+       debugfs_create_file("sii8240_avi", S_IRUGO, NULL, NULL, &debug_AVI_fops);
+#endif   	   
+	   
 //ASUS_BSP , force return for OTG mode
 	return 0;
 
@@ -1460,12 +1484,7 @@ int CarKitInitialize(void)
 	    return -1;	
 	}	
 
-#ifdef CONFIG_DEBUG_FS
-       debugfs_create_file("sii8240", S_IRUGO, NULL, NULL, &debug_fops);
-       debugfs_create_file("sii8240_tpi_on", S_IRUGO, NULL, NULL, &debug_TPISysCtrl_on_fops);
-       debugfs_create_file("sii8240_tpi_off", S_IRUGO, NULL, NULL, &debug_TPISysCtrl_off_fops);
-       debugfs_create_file("sii8240_avi", S_IRUGO, NULL, NULL, &debug_AVI_fops);
-#endif    
+ 
 //ASUS_BSP , for debug usage, set carkit uevent in MHL driver +++
 	g_b_SwitchCarkitInitial = 1;
 //ASUS_BSP , for debug usage, set carkit uevent in MHL driver ---
@@ -1946,6 +1965,10 @@ i=i;
 			else
 			{		
 				intMStatus = 1;
+				
+				if (g_pad_tv_mode == MHL_TV_MODE)
+                	msleep(100); 
+					
 				//TX_DEBUG_PRINT(("[MHL] Linux loop INT low continue ..... \n"));		
 			}
 		}

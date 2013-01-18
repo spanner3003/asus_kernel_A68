@@ -787,7 +787,7 @@ int rmi_f1a_attention(struct rmi_function_container *fc, u8 *irq_bits)
 
 //ASUS_BSP simpson: add for 2d_block +++
 	if ((g_SYNA_2d_block > 0)&&(*f1a->button_data_buffer > 0)){
-		printk("[touch_synaptics] 2D-Block!!\n");
+		rmi_debug(DEBUG_VERBOSE, "[touch_synaptics] 2D-Block!!\n");
 		return 0;
 	}
 //ASUS_BSP simpson: add for 2d_block ---
@@ -812,7 +812,7 @@ int rmi_f1a_attention(struct rmi_function_container *fc, u8 *irq_bits)
 		/* Generate an event here. */
 		input_report_key(f1a->input, f1a->button_map[button],
 					button_status);
-		//printk("[touch_synaptics] buffer=%d, key=%d, status=%d\n",*f1a->button_data_buffer, f1a->button_map[button], button_status);
+		rmi_debug(DEBUG_TRACE, "[touch_synaptics] buffer=%d, key=%d, status=%d\n",*f1a->button_data_buffer, f1a->button_map[button], button_status);
 	}
 
 //ASUS_BSP simpson: add for keypad_bl +++
@@ -824,7 +824,7 @@ int rmi_f1a_attention(struct rmi_function_container *fc, u8 *irq_bits)
 	} else {
 		//ASUS_BSP simpson: add for 2d_block +++
 		if (g_SYNA_2d_block > 0){
-			printk("[touch_synaptics] 2D-Blocked!!\n");
+			rmi_debug(DEBUG_VERBOSE, "[touch_synaptics] 2D-Blocked!!\n");
 		} else {
 		//ASUS_BSP simpson: add for 2d_block ---
 			queue_delayed_work(keypad_bl_workqueue, &keypad_off_work, msecs_to_jiffies(user_duration));

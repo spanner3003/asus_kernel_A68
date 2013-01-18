@@ -1459,11 +1459,17 @@ static void AXC_Smb346_Charger_SetCharger(AXI_Charger *apCharger , AXE_Charger_T
 
 //A68 set smb346 default charging setting+++
 #ifndef ASUS_FACTORY_BUILD
+	//Eason: when AC dont set default current. when phone Cap low can always draw 1200mA from boot to kernel+++ 
+	if(HIGH_CURRENT_CHARGER_TYPE!=aeChargerType)
+	{
             disableAICL();
             defaultSmb346chgSetting();
 		enableAICL();
+		printk("[BAT][CHG]default setting\n");
+	}
+	//Eason: when AC dont set default current. when phone Cap low can always draw 1200mA from boot to kernel---
 		g_AICLlimit = false;
-            printk("[BAT][CHG]default setting\n");
+           
 #endif//#ifndef ASUS_FACTORY_BUILD
 //A68 set smb346 default charging setting---            
 
@@ -1986,11 +1992,7 @@ static int smb346_probe(struct i2c_client *client, const struct i2c_device_id *d
     //Eason: set default Float Voltage +++
     setSmb346FloatVoltageDefault();
     //Eason: set default Float Voltage ---
-	//Eason:set default current 900mA +++
-#ifndef ASUS_FACTORY_BUILD
-	defaultSmb346chgSetting();
-#endif	
-	//Eason:set default current 900mA ---
+
 
 	//Eason: AICL work around +++
 	INIT_DELAYED_WORK(&AICLWorker,checkAICL); 

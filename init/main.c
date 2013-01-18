@@ -225,6 +225,12 @@ static int set_hardware_id(char *str)
 		g_A68_hwID = A68_MP;
 		strcat(hwid_info,str);
 		printk("Kernel HW ID = A68_MP\n");
+	}
+	else if ( strcmp("A68_CD", str) == 0 )
+	{
+		g_A68_hwID = A68_CD;
+		strcat(hwid_info,str);
+		printk("Kernel HW ID = A68_CD\n");
 	}	
 	else if ( strcmp("A80_EVB", str) == 0 )
 	{

@@ -199,12 +199,21 @@ static inline int arch_spin_trylock(arch_spinlock_t *lock)
 	return !tmp;
 }
 
+static inline int arch_spin_is_locked(arch_spinlock_t *lock)
+{
+	unsigned long tmp = ACCESS_ONCE(lock->lock);
+	return (((tmp >> TICKET_SHIFT) ^ tmp) & TICKET_MASK) != 0;
+}
+
 static inline void arch_spin_unlock(arch_spinlock_t *lock)
 {
 	unsigned long ticket, tmp;
 
 	smp_mb();
-
+#ifndef ASUS_SHIP_BUILD 
+	if(!arch_spin_is_locked(lock))
+		BUG(); 
+#endif
 	/* Bump now_serving by 1 */
 	__asm__ __volatile__(
 "1:	ldrex	%[ticket], [%[lockaddr]]\n"
@@ -238,12 +247,6 @@ static inline void arch_spin_unlock_wait(arch_spinlock_t *lock)
 	: [ticket]"=&r" (ticket)
 	: [lockaddr]"r" (&lock->lock)
 	: "cc");
-}
-
-static inline int arch_spin_is_locked(arch_spinlock_t *lock)
-{
-	unsigned long tmp = ACCESS_ONCE(lock->lock);
-	return (((tmp >> TICKET_SHIFT) ^ tmp) & TICKET_MASK) != 0;
 }
 
 static inline int arch_spin_is_contended(arch_spinlock_t *lock)
