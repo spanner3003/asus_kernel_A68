@@ -399,8 +399,8 @@ int mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
 		  (value << 8) |
 		  set;
 		cmd.flags = MMC_CMD_AC;
-	if (index == EXT_CSD_BKOPS_START &&
-	    card->ext_csd.raw_bkops_status < EXT_CSD_BKOPS_LEVEL_2)
+	if (index == EXT_CSD_BKOPS_START /* &&
+	    card->ext_csd.raw_bkops_status < EXT_CSD_BKOPS_LEVEL_2*/)  //ASUS_BSP Josh_Liao "use nonblocking BKOPS"
 		cmd.flags |= MMC_RSP_SPI_R1 | MMC_RSP_R1;
 	else
 		cmd.flags |= MMC_RSP_SPI_R1B | MMC_RSP_R1B;
@@ -592,9 +592,13 @@ int mmc_send_hpi_cmd(struct mmc_card *card, u32 *status)
 
 	err = mmc_wait_for_cmd(card->host, &cmd, 0);
 	if (err) {
-		pr_warn("%s: error %d interrupting operation. "
-			"HPI command response %#x\n", mmc_hostname(card->host),
-			err, cmd.resp[0]);
+//josh++
+//		pr_warn("%s: error %d interrupting operation. "
+//			"HPI command response %#x\n", mmc_hostname(card->host),
+//			err, cmd.resp[0]);
+		if (status)
+			*status = cmd.resp[0];
+//josh--
 		return err;
 	}
 	if (status)

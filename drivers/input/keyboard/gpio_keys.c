@@ -52,7 +52,7 @@ static int pwk_wake = 0;
 extern int g_flag_csvoice_fe_connected;
 extern int FMStatus;
 
-
+struct kobject *kobj;//ASUS_BSP + [thomas]Send uevent to userspace
 struct pad_buttons_code {
     int vol_up;
     int vol_down;
@@ -435,6 +435,7 @@ extern void resetdevice(void);
 #include <linux/asus_global.h>
 extern struct _asus_global asus_global;
 int volumedownkeystatus;
+int bootupcount = 0;
 static void gpio_keys_gpio_report_event(struct gpio_button_data *bdata)
 {
 	const struct gpio_keys_button *button = bdata->button;
@@ -443,12 +444,20 @@ static void gpio_keys_gpio_report_event(struct gpio_button_data *bdata)
 	int state = (gpio_get_value_cansleep(button->gpio) ? 1 : 0) ^ button->active_low;
    	int volume_up_key, volume_down_key;
    	int volume_down_key_status_change_from_press = 0;
+	char *envp[3];//ASUS_BSP + [thomas]Send uevent to userspace
 	volume_up_key = 53;
 	volume_down_key = 54;
 
 	GPIO_KEYS_PRINTK(DEBUG_REPORT_EVENT,"key code=%d  state=%s\n",
 			button->code,state ? "press" : "release");  //ASUS BSP HANS+
-
+	//ASUS_BSP +++ [thomas]Send uevent to userspace
+	envp[0] = "top_event";
+	envp[1] = NULL;
+	if (bootupcount == 10 && (gpio_get_value_cansleep(volume_down_key) == 0) && (gpio_get_value_cansleep(volume_up_key) == 0))
+		kobject_uevent_env(kobj,KOBJ_ONLINE,envp);
+	if (bootupcount < 10)
+		bootupcount++;
+	//ASUS_BSP --- [thomas]Send uevent to userspace
 	if (gpio_get_value_cansleep(volume_up_key) == 0){
 		count_start = 1;
 	}
@@ -1544,7 +1553,7 @@ static int __devinit gpio_keys_probe(struct platform_device *pdev)
 	input_set_capability(input, EV_KEY, POWER_KEY_TEST);
 #endif
 //ASUS HANS--
-
+	kobj = &pdev->dev.kobj;//ASUS_BSP + [thomas]Send uevent to userspace
 	return 0;
 
  fail3:
@@ -1713,7 +1722,9 @@ static struct platform_driver gpio_keys_device_driver = {
 	}
 };
 
-
+//ASUS_BSP+++ BennyCheng "speed up resume time by active microp earlier"
+extern void msm_otg_host_power_on_wq(void);
+//ASUS_BSP--- BennyCheng "speed up resume time by active microp earlier"
 static void Pad_keys_report_event(int button_code, int press)
 {
 
@@ -1722,6 +1733,9 @@ static void Pad_keys_report_event(int button_code, int press)
 
 //Ledger ++
         if (button_code==PAD_KEY_POWER && press){     //press
+                //ASUS_BSP+++ BennyCheng "speed up resume time by active microp earlier"
+                msm_otg_host_power_on_wq();
+                //ASUS_BSP--- BennyCheng "speed up resume time by active microp earlier"
                 printk("[PM]%s- p03 pwr key:%x,pm sts:%x,keylock sts:%x\r\n",__func__,press,g_bResume,g_bpwr_key_lock_sts);
                 if (g_bResume) {
                         wake_lock_timeout(&pwr_key_wake_lock, 3 * HZ);

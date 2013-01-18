@@ -923,6 +923,7 @@ static inline time_t  updateNowTime(struct AXC_BatteryService *_this)
 }
 
 //ASUS_BSP  +++ Eason_Chang "add BAT info time"
+#if 0 
 static void ReportTime(void)
 {
 	struct timespec ts;
@@ -938,6 +939,7 @@ static void ReportTime(void)
 		,tm.tm_min
 		,tm.tm_sec);
 }
+#endif
 //ASUS_BSP  --- Eason_Chang "add BAT info time"
 
 void Init_BalanceMode_Flag(void)
@@ -1316,7 +1318,7 @@ static void SetRTCAlarm(void)
 //Eason: dynamic set Pad alarm ---
     
     pr_debug("[BAT][alarm]:%ld,A66:%d\n",new_alarm_time.tv_sec,balance_this->A66_capacity);
-    ReportTime();
+    //ReportTime();
     spin_lock_irqsave(&bat_alarm_slock, flags);
     alarm_enabled |= alarm_type_mask;
     alarm_start_range(&bat_alarm,
@@ -1372,7 +1374,7 @@ static void SetBatLowRTCAlarm(void)
     
     printk("[BAT][alarm][BatLow]:%ld,A66:%d\n",new_batLowAlarm_time.tv_sec
                                 ,balance_this->BatteryService_IsBatLow);
-    ReportTime();
+    //ReportTime();
     spin_lock_irqsave(&batLow_alarm_slock, batlowflags);
     batLowAlarm_enabled |= batLowAlarm_type_mask;
     alarm_start_range(&batLow_alarm,
@@ -1416,7 +1418,7 @@ static void SetCableInRTCAlarm(void)
     
     printk("[BAT][alarm][cableIn]:%ld,A66:%d\n",new_cableInAlarm_time.tv_sec
                                 ,balance_this->BatteryService_IsCable);
-    ReportTime();
+    //ReportTime();
     spin_lock_irqsave(&cableIn_alarm_slock, cableInflags);
     cableInAlarm_enabled |= cableInAlarm_type_mask;
     alarm_start_range(&cableIn_alarm,
@@ -1793,7 +1795,7 @@ static void ResumeCalCap(struct work_struct *dat)
     printk("[BAT][Ser]:ResumeCalCap()===:%ld,%ld,%ld,A66:%d\n"
             ,nowResumeTime,balance_this->savedTime,nowResumeInterval,balance_this->A66_capacity);
 
-    ReportTime();
+    //ReportTime();
 
 //Eason resume always calculate capacity no matter if in   Pad or CableIn or BatLow+++
    if(true==needDoResume)
@@ -1869,7 +1871,7 @@ static void CableOffKeep5Min(struct work_struct *dat)
     }
     printk("[BAT][Ser]:CableOffKeep5()===:%ld,%ld,%ld\n"
             ,nowCableOffTime,balance_this->savedTime,nowCableOffInterval);
-    ReportTime();
+    //ReportTime();
 
     if(true==needDoCableOffKeep5Min)
     {
@@ -1948,6 +1950,18 @@ static void UpdatePadInfo(struct work_struct *dat)
 }
 //Eason after Pad update firmware, update status ---
 
+//Eason: use queue doBalanceMode in less 5min forceResume+++ 
+static void forceResumeLess5minDobalanceWork(struct work_struct *dat)
+{
+		if(false == DecideIfPadDockHaveExtChgAC())
+		{
+	    		printk("[BAT][Ser]:less 5 min forceResume()+++\n");
+	    		BatteryServiceDoBalance(balance_this);
+			printk("[BAT][Ser]:less 5 min forceResume()---\n");	
+		}	
+}
+//Eason: use queue doBalanceMode in less 5min forceResume---
+
 static void BatteryService_InitWoker(AXC_BatteryService *_this)
 {
         _this->BatteryServiceCapUpdateQueue \
@@ -1994,6 +2008,10 @@ static void BatteryService_InitWoker(AXC_BatteryService *_this)
 	//Eason after Pad update firmware, update status +++
         INIT_DELAYED_WORK(&_this->UpdatePadWorker,UpdatePadInfo);
 	//Eason after Pad update firmware, update status ---
+
+	//Eason: use queue doBalanceMode in less 5min forceResume+++ 
+	INIT_DELAYED_WORK(&_this->Less5MinDoBalanceWorker,forceResumeLess5minDobalanceWork);
+	//Eason: use queue doBalanceMode in less 5min forceResume---
 
 }
 
@@ -2495,7 +2513,7 @@ static void AXC_BatteryService_forceResume(struct AXI_BatteryServiceFacade *bat,
         queue_delayed_work(_this->BatteryServiceCapUpdateQueue, \
                                &_this->BatteryServiceUpdateWorker,\
                                delayStartInSeconds * HZ);
-        ReportTime();
+        //ReportTime();
 
         if( false == reportRtcReady()){
             queue_delayed_work(_this->BatteryServiceCapUpdateQueue,
@@ -2508,11 +2526,15 @@ static void AXC_BatteryService_forceResume(struct AXI_BatteryServiceFacade *bat,
     }
 //Eason: A68 new balance mode +++	
 #ifndef ASUS_FACTORY_BUILD	
-    else if((1==AX_MicroP_IsP01Connected())&&(1 == IsBalanceMode)&&(false == DecideIfPadDockHaveExtChgAC()))
+	//Eason: use queue doBalanceMode in less 5min forceResume+++
+		/*
+			Eason:put judge (false == DecideIfPadDockHaveExtChgAC() in worker Less5MinDoBalanceWorker to save time
+			//else if((1==AX_MicroP_IsP01Connected())&&(1 == IsBalanceMode)&&(false == DecideIfPadDockHaveExtChgAC()))
+		*/
+    else if((1==AX_MicroP_IsP01Connected())&&(1 == IsBalanceMode))			
     {
-    		printk("[BAT][Ser]:less 5 min forceResume()+++\n");
-    		BatteryServiceDoBalance(balance_this);
-		printk("[BAT][Ser]:less 5 min forceResume()---\n");	
+		queue_delayed_work(_this->BatteryServiceCapUpdateQueue,&_this->Less5MinDoBalanceWorker, 0*HZ);
+	//Eason: use queue doBalanceMode in less 5min forceResume---
     }	
 #endif		
 //Eason: A68 new balance mode ---

@@ -74,8 +74,12 @@ static int mmc_queue_thread(void *d)
 		spin_unlock_irq(q->queue_lock);
 
 		if (req || mq->mqrq_prev->req) {
-			if (mmc_card_doing_bkops(mq->card))
-				mmc_interrupt_bkops(mq->card);
+			if (mmc_card_doing_bkops(mq->card)) {
+//josh++
+				mmc_interrupt_bkops_sp(mq->card, false);
+//				mmc_interrupt_bkops(mq->card);
+//josh--
+			}
 
 			set_current_state(TASK_RUNNING);
 			mq->issue_fn(mq, req);

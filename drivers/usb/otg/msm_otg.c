@@ -476,6 +476,37 @@ void msm_otg_host_power_off(void)
 }
 //ASUS_BSP--- BennyCheng "add none mode switch for use storage case"
 
+//ASUS_BSP+++ BennyCheng "speed up resume time by active microp earlier"
+static void msm_otg_host_power_on(struct work_struct *work)
+{
+	struct msm_otg *motg = the_msm_otg;
+	struct usb_phy *phy = &motg->phy;
+
+	dev_info(phy->dev, "%s()+++\n", __func__);
+
+	if (g_host_mode) {
+		if (AX_MicroP_IsP01Connected() && pad_exist()) {
+			msm_otg_set_microp_mode(MICROP_ACTIVE);
+			if (!msm_otg_get_pad_cbus_en()) {
+				msm_otg_set_pad_cbus_en(1);
+			}
+		}
+	}
+
+	dev_info(phy->dev, "%s()---\n", __func__);
+}
+static DECLARE_WORK(msm_otg_host_power_on_work, msm_otg_host_power_on);
+
+void msm_otg_host_power_on_wq(void)
+{
+	struct msm_otg *motg = the_msm_otg;
+	struct usb_phy *phy = &motg->phy;
+
+	dev_info(phy->dev, "%s: active microp and cbus\n", __func__);
+	queue_work(system_nrt_wq, &msm_otg_host_power_on_work);
+}
+//ASUS_BSP--- BennyCheng "speed up resume time by active microp earlier"
+
 static void msm_otg_early_suspend_delay_work(struct work_struct *w)
 {
 	struct msm_otg *motg = the_msm_otg;

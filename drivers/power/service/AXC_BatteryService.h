@@ -85,7 +85,8 @@ typedef struct AXC_BatteryService {
     struct delayed_work SetCableInRTCWorker;
     struct delayed_work BmsChgBeganWorker;
     struct delayed_work BmsChgEndWorker;
-    struct delayed_work UpdatePadWorker; 	
+    struct delayed_work UpdatePadWorker;
+    struct delayed_work Less5MinDoBalanceWorker;//Eason: use queue doBalanceMode in less 5min forceResume	
 	 
 	AXI_Charging_FSM_Callback fsmCallback;
 	AXC_Charging_FSM *fsm;

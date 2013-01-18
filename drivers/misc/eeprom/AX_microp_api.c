@@ -132,7 +132,6 @@ EXPORT_SYMBOL_GPL(AX_MicroP_get_ChargingStatus);
 int AX_MicroP_get_USBDetectStatus(int target){
     	int regval=0;
        int ret=0;
-       unsigned int adc_volt=0;
        if(AX_MicroP_IsP01Connected()==0){
             printk("%s: P01 removed\r\n",__FUNCTION__);
             return -1;
@@ -146,16 +145,15 @@ int AX_MicroP_get_USBDetectStatus(int target){
 
        if(target==Batt_P01){
 
-                ret=uP_nuvoton_read_reg(MICROP_ADC_LEVEL,&adc_volt);
                 ret=uP_nuvoton_read_reg(MICROP_USB_DET,&regval);
 
-                printk("<adc, usb_det>=<%x,%d>\r\n", adc_volt, regval);
+                printk("<usb_det>=<%d>\r\n", regval);
                 if(ret <= 0 || regval==255)
                         regval=P01_CABLE_UNKNOWN;
                 else if(regval==0){
                         regval=P01_CABLE_NO;
                 }
-                else if(adc_volt >= 3000 || regval==1)
+                else if(regval==1)
                         regval=P01_CABLE_CHARGER;
                 else if(regval==2)
                         regval=P01_CABLE_USB;

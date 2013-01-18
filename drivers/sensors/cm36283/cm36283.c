@@ -1144,6 +1144,8 @@ static int ambientDev_put_property(struct proximity_class_dev *sdev, enum proxim
                          g_HAL_als_switch_on);
 
 			cm36283_turn_onoff_als(g_HAL_als_switch_on);
+			/*Get lightsensor value immediately*/
+			queue_work(cm36283_workqueue, &cm36283_light_interrupt_work);
               }
 		break;
 

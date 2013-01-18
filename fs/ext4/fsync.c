@@ -34,6 +34,10 @@
 
 #include <trace/events/ext4.h>
 
+//ASUS_BSP +++ Josh_Liao "show the file taking long time to sync"
+#include <linux/jiffies.h>
+//ASUS_BSP --- Josh_Liao "show the file taking long time to sync"
+
 static void dump_completed_IO(struct inode * inode)
 {
 #ifdef	EXT4FS_DEBUG
@@ -213,6 +217,10 @@ int ext4_sync_file(struct file *file, loff_t start, loff_t end, int datasync)
 	int ret;
 	tid_t commit_tid;
 	bool needs_barrier = false;
+//ASUS_BSP +++ Josh_Liao "show the file taking long time to sync"
+	unsigned long cost_time = 0;
+	unsigned long start_j = jiffies;
+//ASUS_BSP --- Josh_Liao "show the file taking long time to sync"
 
 	J_ASSERT(ext4_journal_current_handle() == NULL);
 
@@ -267,5 +275,12 @@ int ext4_sync_file(struct file *file, loff_t start, loff_t end, int datasync)
  out:
 	mutex_unlock(&inode->i_mutex);
 	trace_ext4_sync_file_exit(inode, ret);
+//ASUS_BSP +++ Josh_Liao "show the file taking long time to sync"
+	cost_time = (jiffies - start_j)*1000/HZ;
+	if (cost_time > 5000) {
+		if (file->f_dentry->d_iname)
+			printk(KERN_INFO "EXT4-fs, %s takes %ld msecs to sync file \n", file->f_dentry->d_iname, cost_time);
+	}
+//ASUS_BSP --- Josh_Liao "show the file taking long time to sync"
 	return ret;
 }

@@ -284,7 +284,12 @@ static int uP_i2c_read(u8 addr, int len, void *data)
             do{    
                     status = i2c_transfer(g_uP_info->i2c_client->adapter, msg, ARRAY_SIZE(msg));
                     if ((status < 0) && (i < retries)){
-                                if(g_i2c_bus_suspended){
+                                if(!pad_exist()){
+                                        printk("%s: give up retry, pad_exist=%d\r\n", __FUNCTION__, pad_exist());
+                                        break;
+                                }
+
+                                else if(g_i2c_bus_suspended){
                                         printk("%s retry %d, pad bus-0 not ready\r\n", __FUNCTION__, i);
                                         msleep(100);              
                                 }                            
@@ -338,8 +343,12 @@ static int uP_i2c_write(u8 addr, int len, void *data)
 
         do {
                 status = i2c_transfer(g_uP_info->i2c_client->adapter, msg, ARRAY_SIZE(msg));
-                if ((status < 0) && (i < retries)){
-                            if(g_i2c_bus_suspended){
+                if ((status < 0) && (i < retries) ){
+                            if(!pad_exist()){
+                                    printk("%s: give up retry, pad_exist=%d\r\n", __FUNCTION__, pad_exist());
+                                    break;
+                            }
+                            else if(g_i2c_bus_suspended){
                                     printk("%s retry %d, pad bus-0 not ready\r\n", __FUNCTION__, i);
                                     msleep(100);              
                             }
@@ -747,7 +756,7 @@ void TriggerPadStationPowerOff(void){
 
 void reportPadStationI2CFail(char *devname){
 
-        printk("%s: ++\r\n", __FUNCTION__);
+        printk("%s: ++ <gpio36, gpio72>= <%d, %d>\r\n", __FUNCTION__, gpio_get_value(36), gpio_get_value(72));
         if(g_prop_virtualRemoveEnabled){
                     if(g_i2c_bus_suspended)
                                 printk("%s: Bus Suspended: Skip\r\n", __FUNCTION__);                                            
@@ -982,10 +991,9 @@ static void microP_work(struct work_struct *work)
                                         }                                            
 
                                         if( is_Mode_APROM()){
-                                                            uP_nuvoton_write_reg(MICROP_IND_A68_READY,&a68_ready);
+
                                                             uP_nuvoton_read_reg(MICROP_INTR_STATUS,&reg_intr_sta);
-                                                            uP_nuvoton_read_reg(MICROP_GPIO_INPUT_LEVEL,&reg_input);
-                                                            pr_debug("MicroP intr: status=%8x, input=%8x\r\n",reg_intr_sta,reg_input);
+                                                            pr_debug("MicroP intr: status=%8x\r\n",reg_intr_sta);
                                                             
                                                             if(IsP01NoIntrEvt()){
                                                                                 pr_debug("MicroP No Event !! wait..\r\n");
@@ -993,6 +1001,9 @@ static void microP_work(struct work_struct *work)
                                                                                 wait_cnt++;
                                                             }
                                                             else{        
+                                                                                uP_nuvoton_read_reg(MICROP_GPIO_INPUT_LEVEL,&reg_input);
+                                                                                pr_debug("MicroP intr: input=%8x\r\n",reg_input);
+                                                                                uP_nuvoton_write_reg(MICROP_IND_A68_READY,&a68_ready);
                                                                                 if(IsDockInOut()){
                                                                                     if(IsDockPlugged()){
                                                                                                printk("MicroP EC_Dock_in !!\n");
@@ -1152,11 +1163,7 @@ int getCmdID(int addr){
 
 
 int isFirmwareUpdating(void){        
-    if((g_fw_update_progress>0 && g_fw_update_progress<100 ) || !is_Mode_APROM()){
-            printk("isFirmwareUpdating: 1\r\n");
-            return 1;
-     }
-    return 0;
+    return (!is_Mode_APROM());
 }
 
 /*
@@ -1782,8 +1789,8 @@ static ssize_t pad_notify_switch_state(struct switch_dev *sdev, char *buf)
 static int microp_suspend(struct i2c_client *client,
 	pm_message_t mesg)
 {
-       printk("%s ++\r\n",__FUNCTION__);
-       if(AX_MicroP_IsP01Connected()){              
+       printk("%s ++, pad_exist=%d\r\n",__FUNCTION__, pad_exist());
+       if(AX_MicroP_IsP01Connected() && pad_exist()){              
 #ifdef ASUS_FACTORY_BUILD                        
                AX_MicroP_enablePinInterrupt(INTR_EN_VOL_DOWN | INTR_EN_VOL_UP|INTR_EN_CAP_RPOX_INT, 0);
 #else
@@ -1799,9 +1806,9 @@ static int microp_resume(struct i2c_client *client)
        // for debug
        uint32_t reg_input=0, out_reg=0, state=0 ;
        uint8_t reg_powerOnReason;
-       printk("%s ++\r\n",__FUNCTION__);
+       printk("%s ++, pad_exist=%d\r\n",__FUNCTION__, pad_exist());
        disable_irq_wake(g_uP_info->i2c_client->irq);
-       if(AX_MicroP_IsP01Connected()){       
+       if(AX_MicroP_IsP01Connected() && pad_exist()){       
 #ifdef ASUS_FACTORY_BUILD                               
                AX_MicroP_enablePinInterrupt(INTR_EN_VOL_DOWN | INTR_EN_VOL_UP|INTR_EN_CAP_RPOX_INT, 1);
 #else

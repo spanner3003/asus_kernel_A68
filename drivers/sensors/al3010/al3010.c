@@ -97,7 +97,7 @@ static int g_AlsP01ProbeError = 0xff;
 
 static int g_al3010_switch_earlysuspend = 0;
 static int g_al3010_light = 0;
-static int g_last_al3010_light = 0;
+static int g_last_al3010_light = -1;
 static int p_als_threshold_lo = 0;
 static int p_als_threshold_hi = 0;
 
@@ -397,6 +397,9 @@ int set_als_power_state_of_P01(int state)
 		else
 			printk(DBGMSK_PRX_G2"[al3010][als] P02 light sensor dev_close\n");
 	}
+
+	if ( g_al3010_switch_on )
+		queue_work(al3010light_workqueue ,&al3010_ISR_work);
 	
 	return ret;
 }
@@ -1287,6 +1290,10 @@ static void lightsensor_attached_pad_P01(struct work_struct *work)
 
 	if (g_HAL_als_switch_on) {
 		g_al3010_suspend_switch_on = 0;
+
+		/*Switch Phone light value to Pad*/
+		g_last_al3010_light = g_cm36283_light;
+		
 		/*Wait al3010 stable*/
 		queue_delayed_work(Al3010light_delay_workqueue, &Al3010light_resume_work, 100 );
 
