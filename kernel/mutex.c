@@ -35,7 +35,7 @@
 # include "mutex.h"
 # include <asm/mutex.h>
 #endif
-
+extern struct mutex fake_mutex;
 void
 __mutex_init(struct mutex *lock, const char *name, struct lock_class_key *key)
 {
@@ -246,7 +246,7 @@ __mutex_lock_common(struct mutex *lock, long state, unsigned int subclass,
 		spin_unlock_mutex(&lock->wait_lock, flags);
 		task_thread_info(task)->pWaitingMutex = lock;
 		schedule_preempt_disabled();
-		task_thread_info(task)->pWaitingMutex = NULL;
+		task_thread_info(task)->pWaitingMutex = &fake_mutex;
 		spin_lock_mutex(&lock->wait_lock, flags);
 	}
 

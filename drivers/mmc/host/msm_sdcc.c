@@ -4711,6 +4711,9 @@ static void msmsdcc_early_suspend(struct early_suspend *h)
 	unsigned long flags;
 
 	spin_lock_irqsave(&host->lock, flags);
+//ASUS_BSP +++ Josh_Liao "During early suspend, start bkops with interval 0.5s at least"
+	host->mmc->during_early_suspend = true;
+//ASUS_BSP --- Josh_Liao "During early suspend, start bkops with interval 0.5s at least"
 	host->polling_enabled = host->mmc->caps & MMC_CAP_NEEDS_POLL;
 	host->mmc->caps &= ~MMC_CAP_NEEDS_POLL;
 	spin_unlock_irqrestore(&host->lock, flags);
@@ -4720,7 +4723,11 @@ static void msmsdcc_late_resume(struct early_suspend *h)
 	struct msmsdcc_host *host =
 		container_of(h, struct msmsdcc_host, early_suspend);
 	unsigned long flags;
-
+//ASUS_BSP +++ Josh_Liao "During early suspend, start bkops with interval 0.5s at least"
+	spin_lock_irqsave(&host->lock, flags);
+	host->mmc->during_early_suspend = false;
+	spin_unlock_irqrestore(&host->lock, flags);
+//ASUS_BSP --- Josh_Liao "During early suspend, start bkops with interval 0.5s at least"
 	if (host->polling_enabled) {
 		spin_lock_irqsave(&host->lock, flags);
 		host->mmc->caps |= MMC_CAP_NEEDS_POLL;

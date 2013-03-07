@@ -24,10 +24,18 @@
 extern int g_user_dbg_mode;
 
 #include <linux/rtc.h>
+#include "rtmutex_common.h"
 
 int entering_suspend = 0;
 unsigned int PRINTK_BUFFER;
 extern struct timezone sys_tz;
+#define RT_MUTEX_HAS_WAITERS	1UL
+#define RT_MUTEX_OWNER_MASKALL	1UL
+
+struct mutex fake_mutex;
+struct completion fake_completion;
+struct rt_mutex fake_rtmutex;
+
 int asus_rtc_read_time(struct rtc_time *tm)
 {
     struct timespec ts; 
@@ -245,12 +253,47 @@ void print_all_thread_info(void)
         save_log("%-6d", pti->preempt_count);    
         
         
-        if(pti->pWaitingMutex)
-            save_log("    Mutex:%s, Owned by pID(%d) %s", pti->pWaitingMutex->name + 1, pti->pWaitingMutex->owner->pid, pti->pWaitingMutex->owner->comm);
-#ifndef ASUS_SHIP_BUILD
-	if(pti->pWaitingCompletion)
-	    save_log("    Completion:wait_for_completion %s", pti->pWaitingCompletion->name );
-#endif
+        if(pti->pWaitingMutex != &fake_mutex && pti->pWaitingMutex != NULL)
+        {
+			if (pti->pWaitingMutex->name)
+			{
+				save_log("    Mutex:%s,", pti->pWaitingMutex->name + 1);
+				printk("    Mutex:%s,", pti->pWaitingMutex->name + 1);
+			}
+			else
+				printk("pti->pWaitingMutex->name == NULL\r\n");
+				
+			if (pti->pWaitingMutex->owner)
+			{
+				save_log(" Owned by pID(%d)", pti->pWaitingMutex->owner->pid);
+				printk(" Owned by pID(%d)", pti->pWaitingMutex->owner->pid);
+			}
+			else
+				printk("pti->pWaitingMutex->owner == NULL\r\n");
+				
+			if (pti->pWaitingMutex->owner->comm)
+			{
+				save_log(" %s",pti->pWaitingMutex->owner->comm);
+				printk(" %s",pti->pWaitingMutex->owner->comm);
+			}
+			else
+				printk("pti->pWaitingMutex->owner->comm == NULL\r\n");
+		}
+
+		if(pti->pWaitingCompletion != &fake_completion && pti->pWaitingCompletion!=NULL)
+		{
+			if (pti->pWaitingCompletion->name)
+	            save_log("    Completion:wait_for_completion %s", pti->pWaitingCompletion->name );
+	        else
+				printk("pti->pWaitingCompletion->name == NULL\r\n");
+		}
+
+        if(pti->pWaitingRTMutex != &fake_rtmutex && pti->pWaitingRTMutex != NULL)
+        {
+			struct task_struct *temp = rt_mutex_owner(pti->pWaitingRTMutex);
+            save_log("    RTMutex: Owned by pID(%d) %s", temp->pid, temp->comm);
+		}
+
 	save_log("\r\n");
         show_stack1(pts, NULL);
         
@@ -280,12 +323,46 @@ void print_all_thread_info(void)
 #endif                
                 save_log("%-6d", pti->preempt_count);    
                 
-                if(pti->pWaitingMutex)
-                    save_log("    Mutex:%s, Owned by pID(%d) %s", pti->pWaitingMutex->name + 1, pti->pWaitingMutex->owner->pid, pti->pWaitingMutex->owner->comm);
-#ifndef ASUS_SHIP_BUILD
-		if(pti->pWaitingCompletion)
-	    	    save_log("    Completion:wait_for_completion %s", pti->pWaitingCompletion->name );
-#endif    
+        if(pti->pWaitingMutex != &fake_mutex && pti->pWaitingMutex != NULL)
+        {
+			if (pti->pWaitingMutex->name)
+			{
+				save_log("    Mutex:%s,", pti->pWaitingMutex->name + 1);
+				printk("    Mutex:%s,", pti->pWaitingMutex->name + 1);
+			}
+			else
+				printk("pti->pWaitingMutex->name == NULL\r\n");
+				
+			if (pti->pWaitingMutex->owner)
+			{
+				save_log(" Owned by pID(%d)", pti->pWaitingMutex->owner->pid);
+				printk(" Owned by pID(%d)", pti->pWaitingMutex->owner->pid);
+			}
+			else
+				printk("pti->pWaitingMutex->owner == NULL\r\n");
+				
+			if (pti->pWaitingMutex->owner->comm)
+			{
+				save_log(" %s",pti->pWaitingMutex->owner->comm);
+				printk(" %s",pti->pWaitingMutex->owner->comm);
+			}
+			else
+				printk("pti->pWaitingMutex->owner->comm == NULL\r\n");
+		}
+
+		if(pti->pWaitingCompletion != &fake_completion && pti->pWaitingCompletion!=NULL)
+		{
+			if (pti->pWaitingCompletion->name)
+	            save_log("    Completion:wait_for_completion %s", pti->pWaitingCompletion->name );
+	        else
+				printk("pti->pWaitingCompletion->name == NULL\r\n");
+		}
+   
+        if(pti->pWaitingRTMutex != &fake_rtmutex && pti->pWaitingRTMutex != NULL)
+        {
+			struct task_struct *temp = rt_mutex_owner(pti->pWaitingRTMutex);
+            save_log("    RTMutex: Owned by pID(%d) %s", temp->pid, temp->comm);
+		} 
                 save_log("\r\n");
                 show_stack1(p1, NULL);
                 
@@ -359,12 +436,47 @@ int find_thread_info(struct task_struct *pts, int force)
             save_log("%-15s", print_state(pts->state));
             save_log("%-6d", pti->preempt_count);    
             
-            if(pti->pWaitingMutex)
-                save_log("    Mutex:%s, Owned by pID(%d) %s", pti->pWaitingMutex->name + 1, pti->pWaitingMutex->owner->pid, pti->pWaitingMutex->owner->comm);
-#ifndef ASUS_SHIP_BUILD
-            if(pti->pWaitingCompletion)
-                save_log("    Completion:%x", (int)pti->pWaitingCompletion);
-#endif                
+        if(pti->pWaitingMutex != &fake_mutex && pti->pWaitingMutex != NULL)
+        {
+			if (pti->pWaitingMutex->name)
+			{
+				save_log("    Mutex:%s,", pti->pWaitingMutex->name + 1);
+				printk("    Mutex:%s,", pti->pWaitingMutex->name + 1);
+			}
+			else
+				printk("pti->pWaitingMutex->name == NULL\r\n");
+				
+			if (pti->pWaitingMutex->owner)
+			{
+				save_log(" Owned by pID(%d)", pti->pWaitingMutex->owner->pid);
+				printk(" Owned by pID(%d)", pti->pWaitingMutex->owner->pid);
+			}
+			else
+				printk("pti->pWaitingMutex->owner == NULL\r\n");
+				
+			if (pti->pWaitingMutex->owner->comm)
+			{
+				save_log(" %s",pti->pWaitingMutex->owner->comm);
+				printk(" %s",pti->pWaitingMutex->owner->comm);
+			}
+			else
+				printk("pti->pWaitingMutex->owner->comm == NULL\r\n");
+		}
+
+            if(pti->pWaitingCompletion != &fake_completion && pti->pWaitingCompletion!=NULL)
+			{
+				if (pti->pWaitingCompletion->name)
+					save_log("    Completion:wait_for_completion %s", pti->pWaitingCompletion->name );
+				else
+					printk("pti->pWaitingCompletion->name == NULL\r\n");
+			}
+    
+        if(pti->pWaitingRTMutex != &fake_rtmutex && pti->pWaitingRTMutex != NULL)
+        {
+			struct task_struct *temp = rt_mutex_owner(pti->pWaitingRTMutex);
+            save_log("    RTMutex: Owned by pID(%d) %s", temp->pid, temp->comm);
+		}
+           
             save_log("\r\n");
             
             show_stack1(pts, NULL);
@@ -468,12 +580,46 @@ void save_all_thread_info(void)
 #endif
         save_log("%-6d", pti->preempt_count);    
         
-        if(pti->pWaitingMutex)
-            save_log("    Mutex:%s, Owned by pID(%d) %s", pti->pWaitingMutex->name + 1, pti->pWaitingMutex->owner->pid, pti->pWaitingMutex->owner->comm);
-#ifndef ASUS_SHIP_BUILD
-	if(pti->pWaitingCompletion)
-	    save_log("    Completion:wait_for_completion %s", pti->pWaitingCompletion->name );
-#endif
+        if(pti->pWaitingMutex != &fake_mutex && pti->pWaitingMutex != NULL)
+        {
+			if (pti->pWaitingMutex->name)
+			{
+				save_log("    Mutex:%s,", pti->pWaitingMutex->name + 1);
+				printk("    Mutex:%s,", pti->pWaitingMutex->name + 1);
+			}
+			else
+				printk("pti->pWaitingMutex->name == NULL\r\n");
+				
+			if (pti->pWaitingMutex->owner)
+			{
+				save_log(" Owned by pID(%d)", pti->pWaitingMutex->owner->pid);
+				printk(" Owned by pID(%d)", pti->pWaitingMutex->owner->pid);
+			}
+			else
+				printk("pti->pWaitingMutex->owner == NULL\r\n");
+				
+			if (pti->pWaitingMutex->owner->comm)
+			{
+				save_log(" %s",pti->pWaitingMutex->owner->comm);
+				printk(" %s",pti->pWaitingMutex->owner->comm);
+			}
+			else
+				printk("pti->pWaitingMutex->owner->comm == NULL\r\n");
+		}
+	if(pti->pWaitingCompletion != &fake_completion && pti->pWaitingCompletion!=NULL)
+	{
+		if (pti->pWaitingCompletion->name)
+			save_log("    Completion:wait_for_completion %s", pti->pWaitingCompletion->name );
+		else
+			printk("pti->pWaitingCompletion->name == NULL\r\n");
+	}
+
+        if(pti->pWaitingRTMutex != &fake_rtmutex && pti->pWaitingRTMutex != NULL)
+        {
+			struct task_struct *temp = rt_mutex_owner(pti->pWaitingRTMutex);
+            save_log("    RTMutex: Owned by pID(%d) %s", temp->pid, temp->comm);
+		}
+		
 #if 0//ndef ASUS_SHIP_BUILD
 	if ( strncmp(pts->comm, "kworker", strlen("kworker")) ==0 )
 	{
@@ -551,12 +697,46 @@ void save_all_thread_info(void)
 #endif
                 save_log("%-6d", pti->preempt_count);    
                 
-                if(pti->pWaitingMutex)
-                    save_log("    Mutex:%s, Owned by pID(%d) %s", pti->pWaitingMutex->name + 1, pti->pWaitingMutex->owner->pid, pti->pWaitingMutex->owner->comm);
-#ifndef ASUS_SHIP_BUILD
-		if(pti->pWaitingCompletion)
+        if(pti->pWaitingMutex != &fake_mutex && pti->pWaitingMutex != NULL)
+        {
+			if (pti->pWaitingMutex->name)
+			{
+				save_log("    Mutex:%s,", pti->pWaitingMutex->name + 1);
+				printk("    Mutex:%s,", pti->pWaitingMutex->name + 1);
+			}
+			else
+				printk("pti->pWaitingMutex->name == NULL\r\n");
+				
+			if (pti->pWaitingMutex->owner)
+			{
+				save_log(" Owned by pID(%d)", pti->pWaitingMutex->owner->pid);
+				printk(" Owned by pID(%d)", pti->pWaitingMutex->owner->pid);
+			}
+			else
+				printk("pti->pWaitingMutex->owner == NULL\r\n");
+				
+			if (pti->pWaitingMutex->owner->comm)
+			{
+				save_log(" %s",pti->pWaitingMutex->owner->comm);
+				printk(" %s",pti->pWaitingMutex->owner->comm);
+			}
+			else
+				printk("pti->pWaitingMutex->owner->comm == NULL\r\n");
+		}
+
+		if(pti->pWaitingCompletion != &fake_completion && pti->pWaitingCompletion!=NULL)
+		{
+			if (pti->pWaitingCompletion->name)
 	            save_log("    Completion:wait_for_completion %s", pti->pWaitingCompletion->name );
-#endif   
+	        else
+				printk("pti->pWaitingCompletion->name == NULL\r\n");
+		}
+  
+        if(pti->pWaitingRTMutex != &fake_rtmutex && pti->pWaitingRTMutex != NULL)
+        {
+			struct task_struct *temp = rt_mutex_owner(pti->pWaitingRTMutex);
+            save_log("    RTMutex: Owned by pID(%d) %s", temp->pid, temp->comm);
+		}
                 save_log("\r\n");
                 show_stack1(p1, NULL);
                 
@@ -1240,14 +1420,63 @@ struct early_suspend asusdebug_early_suspend_handler = {
     .resume = asusdebug_early_resume,
 };
 
+unsigned int asusdebug_enable = 0;
+unsigned int readflag = 0;
+static ssize_t turnon_asusdebug_proc_read(struct file *filp, char __user *buff, size_t len, loff_t *off)
+{
+    char print_buf[32];
+    unsigned int ret = 0,iret = 0;
+    sprintf(print_buf, "asusdebug: %s\n", asusdebug_enable? "Enable":"Disable");
+    ret = strlen(print_buf);
+    iret = copy_to_user(buff, print_buf, ret);
+    if (!readflag){
+               readflag = 1;
+               return ret;
+       }
+       else{
+               readflag = 0;
+               return 0;
+       }
+}
+static ssize_t turnon_asusdebug_proc_write(struct file *filp, const char __user *buff, size_t len, loff_t *off)
+{
+       char messages[256];
+    memset(messages, 0, sizeof(messages));
+       if (len > 256)
+               len = 256;
+       if (copy_from_user(messages, buff, len))
+               return -EFAULT;
+    if(strncmp(messages, "on", 2) == 0)
+    {
+               asusdebug_enable = 0x11223344;
+       }
+       else if(strncmp(messages, "off", 3) == 0)
+       {
+               asusdebug_enable = 0;
+       }
+       return len;
+}
+static struct file_operations turnon_asusdebug_proc_ops = {
+    .read = turnon_asusdebug_proc_read,
+    .write = turnon_asusdebug_proc_write,
+};
+
+
 static int __init proc_asusdebug_init(void)
 {
-
+	
     proc_create("asusdebug", S_IALLUGO, NULL, &proc_asusdebug_operations);
     proc_create("asusevtlog", S_IRWXUGO, NULL, &proc_asusevtlog_operations);
     proc_create("asusevtlog-switch", S_IRWXUGO, NULL, &proc_evtlogswitch_operations);
+    proc_create("asusdebug-switch", S_IRWXUGO, NULL, &turnon_asusdebug_proc_ops);
     PRINTK_BUFFER = (unsigned int)ioremap(PRINTK_BUFFER, PRINTK_BUFFER_SIZE);
     mutex_init(&mA);
+    fake_mutex.owner = current;
+	fake_mutex.name = " fake_mutex";
+	
+	strcpy(fake_completion.name," fake_completion");
+	
+	fake_rtmutex.owner = current;
     //spin_lock_init(&spinlock_eventlog);
     ASUSEvtlog_workQueue  = create_singlethread_workqueue("ASUSEVTLOG_WORKQUEUE");
 

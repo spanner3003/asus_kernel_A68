@@ -85,7 +85,7 @@
 #include "../workqueue_sched.h"
 #include <linux/asus_global.h>
 extern struct _asus_global asus_global;
-
+extern struct completion fake_completion;
 #define CREATE_TRACE_POINTS
 #include <trace/events/sched.h>
 
@@ -3575,6 +3575,7 @@ do_wait_for_common(struct completion *x, long timeout, int state, int iowait)
 
 		__add_wait_queue_tail_exclusive(&x->wait, &wait);
 		do {
+			 task_thread_info(current)->pWaitingCompletion = x;
 			if (signal_pending_state(state, current)) {
 				timeout = -ERESTARTSYS;
 				break;
@@ -3587,6 +3588,7 @@ do_wait_for_common(struct completion *x, long timeout, int state, int iowait)
 				timeout = schedule_timeout(timeout);
 			spin_lock_irq(&x->wait.lock);
 		} while (!x->done && timeout);
+		task_thread_info(current)->pWaitingCompletion = &fake_completion;
 		__remove_wait_queue(&x->wait, &wait);
 		if (!x->done)
 			return timeout;

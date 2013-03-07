@@ -116,6 +116,8 @@ static struct work_struct button_release_work;
 static struct work_struct report_hs_event_work;
 static int hook_irq_balance = 1;
 static int jack_irq_balance = 0;
+static int hp_sent_count = 0;
+static int hs_sent_count = 0;
 int g_bDebugMode = 0;
 EXPORT_SYMBOL(g_bDebugMode);
 
@@ -8147,7 +8149,8 @@ void report_hs_event(struct work_struct *work)
 		gpio_direction_output(PM8921_GPIO_PM_TO_SYS(20), 0);//enable uart log, disable audio
 		button_jiffies = hs_jiffies = 0;
 		gGPIO_JACK_IN = 0;		
-
+        hp_sent_count = 0;
+        hs_sent_count = 0;
 		HEADSET_PRINTK(DEBUG_HEADSET_EVENT,"---[%s]HS detect removal!!! ---\n",__func__);
 	}
 	else {
@@ -8163,12 +8166,34 @@ void report_hs_event(struct work_struct *work)
 		}
 			
 		if (!gpio_get_value(HS_HOOK_DET)) {  //headset
+            hs_sent_count++;
+            if (hp_sent_count == 0){
 			switch_set_state(&g_tabla->headset_jack->sdev, 1);
-			HEADSET_PRINTK(DEBUG_HEADSET_EVENT,"---[%s]HS insertion-(1) ---\n",__func__);
-		}
+			printk("---[%s]HS insertion-(1) ---\n",__func__);
+            }
+            if (hp_sent_count >= 1){
+    		switch_set_state(&g_tabla->headset_jack->sdev, 0);
+            printk("---[%s]send fake removal before sending ''Headset'' event",__func__);
+            switch_set_state(&g_tabla->headset_jack->sdev, 1);
+            hp_sent_count = 0;
+            }
+        }
 		else {  //headphone
+            hp_sent_count++;
+            if (hs_sent_count == 0){
 			switch_set_state(&g_tabla->headset_jack->sdev, 2);
-			HEADSET_PRINTK(DEBUG_HEADSET_EVENT,"---[%s]HP insertion-(2) ---\n",__func__);
+			printk("---[%s]HP insertion-(2) ---\n",__func__);
+            }
+            if (hs_sent_count >= 1){
+            switch_set_state(&g_tabla->headset_jack->sdev, 0);
+            printk("---[%s]send fake removal before sending ''Headphone'' event",__func__);
+            switch_set_state(&g_tabla->headset_jack->sdev, 2);
+            hs_sent_count = 0;
+            //hp_sent_count++;
+            
+            }
+
+
 		}
 	}
 }

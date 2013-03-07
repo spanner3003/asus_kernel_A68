@@ -43,6 +43,11 @@
 #include "sd_ops.h"
 #include "sdio_ops.h"
 
+//ASUS_BSP +++ Josh_Liao "start bkops with interval 3s at least"
+#include <linux/jiffies.h>
+unsigned long start_bkops_j = 0;
+//ASUS_BSP --- Josh_Liao "start bkops with interval 3s at least"
+
 /*
  * The Background operations can take a long time, depends on the house keeping
  * operations the card has to perform
@@ -312,6 +317,17 @@ void mmc_start_bkops(struct mmc_card *card)
 	if (mmc_card_doing_bkops(card) || !mmc_card_need_bkops(card))
 		return;
 
+//ASUS_BSP +++ Josh_Liao "start bkops with interval 3s at least"
+	if (start_bkops_j) {
+//ASUS_BSP Josh_Liao "During early suspend, start bkops with interval 0.5s at least"
+		if (((jiffies - start_bkops_j)*1000/HZ) < (card->host->during_early_suspend ? 500 : 3000)) {
+			return;
+		} else {
+			start_bkops_j = 0;
+		}
+	}
+//ASUS_BSP --- Josh_Liao "start bkops with interval 3s at least"	
+
 	mmc_claim_host(card->host);
 
 //ASUS_BSP +++ Josh_Liao "use nonblocking BKOPS"
@@ -328,6 +344,10 @@ void mmc_start_bkops(struct mmc_card *card)
 		mmc_card_clr_need_bkops(card);
 		goto out;
 	}
+
+//ASUS_BSP +++ Josh_Liao "start bkops with interval 3s at least"
+	start_bkops_j = jiffies;
+//ASUS_BSP --- Josh_Liao "start bkops with interval 3s at least"
 
 	spin_lock_irqsave(&card->host->lock, flags);
 	mmc_card_clr_need_bkops(card);
@@ -608,17 +628,14 @@ int mmc_interrupt_hpi_sp(struct mmc_card *card, bool is_suspend)
 				}
 			}
 
-			if (!is_suspend)
-				mmc_delay(10);
-
 			err = mmc_send_status(card, &status);
 			if (err)
 				break;
 
 			dbg_cnt++;
 
-			if (!is_suspend)
-				mmc_delay(10);
+			if ((!is_suspend)&&(dbg_cnt >= 2))
+				msleep(0);
 		} while (R1_CURRENT_STATE(status) == R1_STATE_PRG);
 	} else
 		pr_debug("%s: Left prg-state\n", mmc_hostname(card->host));

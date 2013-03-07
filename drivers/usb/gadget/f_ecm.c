@@ -442,8 +442,8 @@ static void ecm_notify(struct f_ecm *ecm)
 static void ecm_notify_complete(struct usb_ep *ep, struct usb_request *req)
 {
 	struct f_ecm			*ecm = req->context;
-	struct usb_composite_dev	*cdev = ecm->port.func.config->cdev;
-	struct usb_cdc_notification	*event = req->buf;
+	//struct usb_composite_dev	*cdev = ecm->port.func.config->cdev;
+	//struct usb_cdc_notification	*event = req->buf;
 
 	switch (req->status) {
 	case 0:
@@ -517,7 +517,7 @@ invalid:
 		req->length = value;
 		value = usb_ep_queue(cdev->gadget->ep0, req, GFP_ATOMIC);
 		if (value < 0)
-			ERROR(cdev, "ecm req %02x.%02x response err %d\n",
+			printk("ecm req %02x.%02x response err %d\n",
 					ctrl->bRequestType, ctrl->bRequest,
 					value);
 	}
@@ -620,7 +620,7 @@ static int ecm_get_alt(struct usb_function *f, unsigned intf)
 static void ecm_disable(struct usb_function *f)
 {
 	struct f_ecm		*ecm = func_to_ecm(f);
-	struct usb_composite_dev *cdev = f->config->cdev;
+	//struct usb_composite_dev *cdev = f->config->cdev;
 
 	DBG(cdev, "ecm deactivated\n");
 
@@ -813,7 +813,7 @@ fail:
 	if (ecm->port.in_ep->desc)
 		ecm->port.in_ep->driver_data = NULL;
 
-	ERROR(cdev, "%s: can't bind, err %d\n", f->name, status);
+	printk("%s: can't bind, err %d\n", f->name, status);
 
 	return status;
 }

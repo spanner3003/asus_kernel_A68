@@ -51,6 +51,9 @@ static int pwk_wake = 0;
 
 extern int g_flag_csvoice_fe_connected;
 extern int FMStatus;
+//Maggie +++: for proximity sensor
+extern int g_cm36283_earlysuspend_int;
+//Maggie ---: for proximity sensor
 
 struct kobject *kobj;//ASUS_BSP + [thomas]Send uevent to userspace
 struct pad_buttons_code {
@@ -100,7 +103,7 @@ struct gpio_keys_drvdata {
 //jack for debug slow
 //#include "../../../sound/soc/codecs/wcd9310.h"
 static  struct work_struct __wait_for_two_keys_work;
-
+extern unsigned int asusdebug_enable;
 void wait_for_two_keys_work(struct work_struct *work)
 {
     static int one_instance_running = 0;
@@ -109,7 +112,8 @@ void wait_for_two_keys_work(struct work_struct *work)
     volume_up_key = 53;
     volume_down_key = 54;
     power_key = 26;
-
+	if (!asusdebug_enable)
+	   return;
     //printk("wait_for_two_keys_work++\n");
     if(!one_instance_running)
     { 
@@ -454,7 +458,9 @@ static void gpio_keys_gpio_report_event(struct gpio_button_data *bdata)
 	envp[0] = "top_event";
 	envp[1] = NULL;
 	if (bootupcount == 10 && (gpio_get_value_cansleep(volume_down_key) == 0) && (gpio_get_value_cansleep(volume_up_key) == 0))
-		kobject_uevent_env(kobj,KOBJ_ONLINE,envp);
+	{
+		//kobject_uevent_env(kobj,KOBJ_ONLINE,envp); //send uevent to userspace.
+	}
 	if (bootupcount < 10)
 		bootupcount++;
 	//ASUS_BSP --- [thomas]Send uevent to userspace
@@ -1687,6 +1693,15 @@ static int gpio_keys_suspend_noirq(struct device *dev)
 {
         g_bResume=0;
         printk("[PM]%s:,pm sts:%x,keylock sts:%x\r\n",__func__,g_bResume,g_bpwr_key_lock_sts);
+		
+	//Maggie+++ for proximity sensor detection
+	if(g_cm36283_earlysuspend_int == 1) {
+		printk("[cm36283][suspend_noirq] g_earlysuspend_int = %d, return %d\n",  g_cm36283_earlysuspend_int, -EBUSY);
+		g_cm36283_earlysuspend_int = 0;		
+
+		return -EBUSY;
+	}
+	//Maggie--- for proximity sensor detection
 
         return 0;
 }

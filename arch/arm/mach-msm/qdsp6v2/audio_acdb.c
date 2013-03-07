@@ -22,6 +22,10 @@
 
 #define MAX_NETWORKS		15
 
+/*ASUS_BSP +++ Peter_lu*/
+/*For support when phone call end then turn on panel without any condition*/
+extern void phone_call_end_report_event(void);
+
 struct sidetone_atomic_cal {
 	atomic_t	enable;
 	atomic_t	gain;
@@ -791,6 +795,10 @@ static long acdb_ioctl(struct file *f,
             pr_err("%s: fail to copy g_flag_csvoice_fe_connected!\n", __func__);
             result = -EFAULT;
         }
+/*ASUS_BSP +++ Peter_lu*/
+        if ( g_flag_csvoice_fe_connected == 0 )
+                phone_call_end_report_event();
+/*ASUS_BSP ---*/
         goto done;
     case AUDIO_SET_SKYPE_STATE:      
         if (copy_from_user(&gSKYPE_state, (void *)arg,

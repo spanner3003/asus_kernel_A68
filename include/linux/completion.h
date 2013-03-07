@@ -22,7 +22,7 @@
  * and macros DECLARE_COMPLETION(), DECLARE_COMPLETION_ONSTACK(), and
  * INIT_COMPLETION().
  */
-#ifdef ASUS_SHIP_BUILD
+#if 0
 struct completion {
 	unsigned int done;
 	wait_queue_head_t wait;

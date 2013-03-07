@@ -103,6 +103,20 @@ static int asus_get_emmc_prv(struct mmc_card *card)
 }
 //ASUS_BSP --- Josh_Liao "emmc info for ATD"
 
+//ASUS_BSP +++ Josh_Liao "Only use CMD7 without CMD5 for Hynix 20nm V4.41 eMMC"
+static bool is_hynix_20nm_emmc(struct mmc_card *card)
+{
+	u32 ext_csd_sector_count;
+
+	ext_csd_sector_count = card->ext_csd.raw_sectors[0] << 0 |card->ext_csd.raw_sectors[1] << 8 | card->ext_csd.raw_sectors[2] << 16 |card->ext_csd.raw_sectors[3] << 24;
+
+	if (ext_csd_sector_count == 0x1d5c000 || ext_csd_sector_count == 0x3a40000 || ext_csd_sector_count ==  0x7480000)
+		return true;
+	else
+		return false;
+}
+//ASUS_BSP --- Josh_Liao "Only use CMD7 without CMD5 for Hynix 20nm V4.41 eMMC"
+
 /*
  * Given the decoded CSD structure, decode the raw CID to our CID structure.
  */
@@ -1007,6 +1021,15 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 		err = mmc_read_ext_csd(card, ext_csd);
 		if (err)
 			goto free_card;
+
+//ASUS_BSP +++ Josh_Liao "Only use CMD7 without CMD5 for Hynix 20nm V4.41 eMMC"
+		if (is_hynix_20nm_emmc(card)) {
+			pr_info("%s: use cmd7 without cmd5\n", mmc_hostname(host));
+			card->use_cmd7_without_cmd5 = true;
+		} else {
+			card->use_cmd7_without_cmd5 = false;
+		}
+//ASUS_BSP --- Josh_Liao "Only use CMD7 without CMD5 for Hynix 20nm V4.41 eMMC"
 
 		/* If doing byte addressing, check if required to do sector
 		 * addressing.  Handle the case of <2GB cards needing sector

@@ -305,6 +305,9 @@ struct mmc_card {
 	unsigned int    nr_parts;
 
 	struct mmc_wr_pack_stats wr_pack_stats; /* packed commands stats*/
+//ASUS_BSP +++ Josh_Liao "Only use CMD7 without CMD5 for Hynix 20nm V4.41 eMMC"
+	bool use_cmd7_without_cmd5;	/* Only use cmd7 without cmd5 in suspend and resume */
+//ASUS_BSP --- Josh_Liao "Only use CMD7 without CMD5 for Hynix 20nm V4.41 eMMC"
 };
 
 /*

@@ -63,6 +63,17 @@ int mmc_card_sleepawake(struct mmc_host *host, int sleep)
 	struct mmc_card *card = host->card;
 	int err;
 
+//ASUS_BSP +++ Josh_Liao "Only use CMD7 without CMD5 for Hynix 20nm V4.41 eMMC"
+	if (card->use_cmd7_without_cmd5) {
+		if (sleep)
+			err = mmc_deselect_cards(host);		
+		else
+			err = mmc_select_card(card);
+
+		return err;
+	}	
+//ASUS_BSP --- Josh_Liao "Only use CMD7 without CMD5 for Hynix 20nm V4.41 eMMC"
+
 	if (sleep) {
 		mmc_deselect_cards(host);
 //ASUS_BSP +++ Josh_Liao "workaround to make card always has response after resume"

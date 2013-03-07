@@ -352,7 +352,11 @@ struct mmc_host {
 	} perf;
 	bool perf_enable;
 #endif
-
+//ASUS_BSP +++ Josh_Liao "During early suspend, start bkops with interval 0.5s at least"
+#ifdef CONFIG_HAS_EARLYSUSPEND
+	bool during_early_suspend;
+#endif
+//ASUS_BSP --- Josh_Liao "During early suspend, start bkops with interval 0.5s at least"
 	struct mmc_ios saved_ios;
 	unsigned long		private[0] ____cacheline_aligned;
 };

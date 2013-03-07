@@ -24,10 +24,14 @@
 
 
 /* Bit Description for each cmd */
-#define INIT_ALS	0x0
-#define INIT_PS		0x0
+#define INIT_ALS			0x0
+#define INIT_PS			0x0
 #define DEFAULT_PS_THRESHOLD_lo	10
-#define DEFAULT_PS_THRESHOLD_hi 16
+#define DEFAULT_PS_THRESHOLD_hi	16
+#define JTOUCH_PS_THRESHOLD_lo	17
+#define JTOUCH_PS_THRESHOLD_hi	19
+#define TPK_PS_THRESHOLD_lo		17
+#define TPK_PS_THRESHOLD_hi		19
 
 
 enum cm36283_sensors {

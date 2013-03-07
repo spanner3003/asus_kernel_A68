@@ -111,6 +111,8 @@ static int pad_proxm_switch_on = 0;/*For phone call on in pad issue*/
 static int g_cm36283_switch_earlysuspend = 0;
 static int g_ambient_suspended = 0;
 
+int g_cm36283_earlysuspend_int = 0;		//detect if interrupt occurs after suspend
+
 u16 g_cm36283_light=0;
 static u16 g_last_cm36283_light=0;
 
@@ -298,6 +300,11 @@ extern bool g_bIsP01Attached;
 /////////////////////////////////////////////////////////////////////////////////////////
 //---proximity sensor part---
 //
+//For support new touch panel
+#define TOUCH_ID  "/data/.tmp/A68_TP_ID"
+#define WINTEK_TOUCH			0x00
+#define J_TOUCH					0x02
+#define TPK_TOUCH 				0x08
 
 	/*For Proximity test*/
 static struct delayed_work Proximity_test_work;
@@ -492,14 +499,97 @@ static int cm36283_turn_onoff_proxm(bool bOn)
 	return 0;
 }
 
+//For support new touch panel
+static bool get_threshold_value(void)
+{
+	struct file *fp = NULL; 
+	loff_t pos_lsts = 0;
+	char readstr[8];
+	int touchid = 0, readlen =0;
+	mm_segment_t old_fs;
+	
+	printk("[cm36283][ps] ++Read_touch_ID open\n");
+
+	fp = filp_open( TOUCH_ID , O_RDONLY, S_IRWXU|S_IRWXG|S_IRWXO);
+	if(IS_ERR_OR_NULL(fp)) {
+		printk("[cm36283] Read_touch_ID open (%s) fail\n", TOUCH_ID);
+		//Keep default value
+		g_ps_threshold_lo = DEFAULT_PS_THRESHOLD_lo;
+		g_ps_threshold_hi = DEFAULT_PS_THRESHOLD_hi;
+		return false;
+	}
+
+	old_fs = get_fs();
+	set_fs(KERNEL_DS);
+	
+	if(fp->f_op != NULL && fp->f_op->read != NULL) {
+		pos_lsts = 0;
+		readlen = fp->f_op->read(fp, readstr, 6, &pos_lsts);
+		readstr[readlen] = '\0';
+
+		printk(DBGMSK_PRX_G4"[cm36283] strlen:%s(%d)\n", readstr, strlen(readstr));
+	}
+	else
+		printk("[cm36283] Read_touch_ID, f_op=NULL or op->read=NULL\n");
+
+	set_fs(old_fs);
+	filp_close(fp, NULL);
+
+	touchid = (int)simple_strtol( readstr, NULL, 16 ); 
+	
+	//Check touch ID
+	printk("[cm36283][ps] Get Gouch ID : 0x%x (%s)\n", touchid,readstr);
+	switch (touchid)
+	{
+		case WINTEK_TOUCH:
+			g_ps_threshold_lo = DEFAULT_PS_THRESHOLD_lo;
+			g_ps_threshold_hi = DEFAULT_PS_THRESHOLD_hi;
+			printk("[cm36283][ps] WINTEK_TOUCH low threshold : %d\n", g_ps_threshold_lo);
+			printk("[cm36283][ps] WINTEK_TOUCH high threshold : %d\n", g_ps_threshold_hi);
+			break;
+		case J_TOUCH:
+			g_ps_threshold_lo = JTOUCH_PS_THRESHOLD_lo;
+			g_ps_threshold_hi = JTOUCH_PS_THRESHOLD_hi;
+			printk("[cm36283][ps] J_TOUCH low threshold : %d\n", g_ps_threshold_lo);
+			printk("[cm36283][ps] J_TOUCH high threshold : %d\n", g_ps_threshold_hi);
+			break;
+		case TPK_TOUCH:
+			g_ps_threshold_lo = TPK_PS_THRESHOLD_lo;
+			g_ps_threshold_hi = TPK_PS_THRESHOLD_hi;
+			printk("[cm36283][ps] TPK_TOUCH low threshold : %d\n", g_ps_threshold_lo);
+			printk("[cm36283][ps] TPK_TOUCH high threshold : %d\n", g_ps_threshold_hi);
+			break;
+		default:
+			g_ps_threshold_lo = DEFAULT_PS_THRESHOLD_lo;
+			g_ps_threshold_hi = DEFAULT_PS_THRESHOLD_hi;
+			printk("[cm36283][ps] put default.\n");
+	}
+	
+	printk("[cm36283][ps] --Read_touch_ID open\n");
+	return true;
+}
+
 static int proxmdev_put_property(struct proximity_class_dev *sdev, enum proximity_property property, union proximity_propval *val)
 {
     int ret;
+    static bool bFirst = true;
+    static bool openfilp = true;
 
     switch (property) 
     {
         case SENSORS_PROP_SWITCH:
 		printk(DBGMSK_PRX_G4"[cm36283][ps] put SENSORS_PROP_SWITCH (%d,%d).\n", (val->intval), g_proxm_switch_on );
+
+		//For support new touch panel
+		if(bFirst) {
+			printk(DBGMSK_PRX_G3"[cm36283][ps] put switch 1st read calvalue\n");
+			openfilp = get_threshold_value();
+			if (openfilp == false )
+				printk("[cm36283][ps] Get old calvalue : thd_hi = %d thd_lo = %d or fail\n", g_ps_threshold_hi, g_ps_threshold_lo);
+
+			bFirst = false;
+		}
+		
 		if((g_proxm_switch_on != val->intval) && (!g_bIsP01Attached)) {
 			if(val->intval==1 && g_A68_hwID != A68_SR1_1) { //turn on PS
 				ret = cm36283_turn_onoff_proxm(1);
@@ -1610,8 +1700,13 @@ static void cm36283_interrupt_handler(struct work_struct *work)
 
 	if((buff[1] & 0x30) != 0)
 		queue_work(cm36283_workqueue, &cm36283_light_interrupt_work);
-	else if ((buff[1] & 0x03) != 0)
+	else if ((buff[1] & 0x03) != 0) {
+		if (g_cm36283_switch_earlysuspend==1){
+			printk("[cm36283] setting g_cm36283_earlysuspend_int=%d\n", g_cm36283_earlysuspend_int);
+			g_cm36283_earlysuspend_int = 1;
+		}
 		queue_work(cm36283_workqueue, &cm36283_proximity_interrupt_work);
+	}
 	else if ((buff[1] & 0x40) != 0)
 		printk(DBGMSK_PRX_G2"[cm36283][isr] PS1 entering protection mode\n");
 
@@ -1737,7 +1832,7 @@ static int get_adc_calibrated_lux_from_cm36283(void)
 
 	steps = g_cm36283_light;			// will compare with g_light_level and get the Lux
 	g_cm36283_light_adc = steps;     	// adc is the value that is returned from HW directly ( Original adb number )
-	
+
 	steps = (u32)(steps * g_cm36283_light_calibration_fval_x1000 / 100  + g_cm36283_light_shift_calibration);     //apply calibration value ( Because the panel level, calibration number probably over 10000)
 
 	/*Fix calibration error for Lux*/
@@ -1816,6 +1911,18 @@ void als_lux_report_event(int lux)
 }    
 EXPORT_SYMBOL(als_lux_report_event);
 
+/*For support when phone call end then turn on panel without any condition*/
+void phone_call_end_report_event(void)
+{
+	if ( g_proxm_switch_on && ( !g_bIsP01Attached ) )	{
+		input_report_abs(g_cm36283_data_ps->input_dev, ABS_DISTANCE, 1);
+		input_sync(g_cm36283_data_ps->input_dev);
+		wake_unlock(&proximity_wake_lock);
+		g_proxim_state = 0;
+		printk("[cm36283][ps] Phone call end and attached pad trigger panel on\n");
+	}
+}
+EXPORT_SYMBOL(phone_call_end_report_event);
 
 /**
  * cm36283_read_reg - read data from cm36283
@@ -2174,6 +2281,7 @@ static int cm36283_store_calibration_1000(struct device *dev, struct device_attr
 
 static DEVICE_ATTR(calibration_1000, S_IRWXU | S_IRWXG | S_IRWXO,
 		   cm36283_show_calibration_1000, cm36283_store_calibration_1000);
+#endif
 
 /* adc */
 static int cm36283_show_adc(struct device *dev,	 struct device_attribute *attr, char *buf)
@@ -2198,12 +2306,36 @@ static int cm36283_show_adc(struct device *dev,	 struct device_attribute *attr, 
 	return sprintf(buf, "%d\n", adc);
 }
 
-static DEVICE_ATTR(adc, S_IRWXU | S_IRWXG, cm36283_show_adc, NULL);
+static DEVICE_ATTR(adc, S_IRWXU | S_IRWXG  | S_IROTH, cm36283_show_adc, NULL);
+
+static int cm36283_show_proxm (struct device *dev, struct device_attribute *attr, char *buf)
+{
+
+	int ret;
+	unsigned char buff[2] = {0,0};
+
+	cm36283_turn_onoff_proxm(1);
+
+	ret = cm36283_read_reg(cm36283_client, CM36283_PS_DATA, 2, &buff);
+
+	g_psData = buff[0];
+
+	printk(DBGMSK_PRX_G4"/----------------------------------------------------\n");
+	printk(DBGMSK_PRX_G4"[cm36283][ps] PS_data = %d\n",g_psData);
+	printk(DBGMSK_PRX_G4"/----------------------------------------------------\n");	
+
+	return sprintf(buf, "%d\n", g_psData);
+}
+
+static DEVICE_ATTR(proxm, S_IRWXU | S_IRWXG  | S_IROTH, cm36283_show_proxm, NULL);
 
 static struct attribute *cm36283_attributes[] = {
+#ifdef ASUS_FACTORY_BUILD	
 	&dev_attr_calibration_200.attr,
 	&dev_attr_calibration_1000.attr,
+#endif
 	&dev_attr_adc.attr,
+	&dev_attr_proxm.attr,
 	NULL
 };
 
@@ -2211,7 +2343,6 @@ static const struct attribute_group cm36283_attr_group = {
     .name = "cm36283",
 	.attrs = cm36283_attributes,
 };
-#endif
 
 
 #ifdef CONFIG_I2C_STRESS_TEST
@@ -2366,24 +2497,25 @@ static void cm36283_early_suspend(struct early_suspend *handler)
 
 static void cm36283_late_resume(struct early_suspend *handler)
 {
-	printk("[cm36283] ++cm36283_late_resume, psensor:%d, als:%d\n", g_proxm_switch_on, g_cm36283_als_switch_on);
+
+    printk("[cm36283] ++cm36283_late_resume, psensor:%d, als:%d\n", g_proxm_switch_on, g_cm36283_als_switch_on);
 
 	printk("[cm36283][als] late_resume: g_ambient_suspended = %d\n",g_ambient_suspended);
-	if(g_ambient_suspended==1) {
-		g_cm36283_switch_earlysuspend=0;  //disable this flag for cm36283_turn_onoff_als to turn on als
+    if(g_ambient_suspended==1) {
+        g_cm36283_switch_earlysuspend=0;  //disable this flag for cm36283_turn_onoff_als to turn on als
 		if ( !g_bIsP01Attached )
-			cm36283_turn_onoff_als(1);
+        cm36283_turn_onoff_als(1);
 
-		g_ambient_suspended = 0;
-		g_cm36283_als_switch_on = 1; //this flag is usually changed in put_property.
-		printk("[cm36283][als] late_resume: apply ALS interrupt mode\n");
-	}
+        g_ambient_suspended = 0;
+        g_cm36283_als_switch_on = 1; //this flag is usually changed in put_property.
+        printk("[cm36283][als] late_resume: apply ALS interrupt mode\n");
+    }
 
-	disable_irq_wake(g_cm36283_device.irq);
-	
-	g_cm36283_switch_earlysuspend=0;
+    disable_irq_wake(g_cm36283_device.irq);
+    g_cm36283_switch_earlysuspend=0;
+    g_cm36283_earlysuspend_int = 0;
 
-	printk(DBGMSK_PRX_G2"[cm36283]--cm36283_late_resume\n");
+    printk(DBGMSK_PRX_G2"[cm36283]--cm36283_late_resume\n");
 }
 
 
@@ -2613,23 +2745,16 @@ static int cm36283_probe(struct i2c_client *client, const struct i2c_device_id *
 	printk(DBGMSK_PRX_G2"[cm36283]++cm36283_probe: create_group\n");
 	/* register sysfs hooks */
 
-#ifdef ASUS_FACTORY_BUILD
 	ret = sysfs_create_group(&client->dev.kobj, &cm36283_attr_group);
 	if (ret)
 		goto cm36283_probe_err;
-#endif
 	
-
     printk(DBGMSK_PRX_G2"[cm36283] cm36283_probe -.\n");
 
     return 0;
 
 cm36283_probe_err:
     printk(DBGMSK_PRX_G0"[cm36283] cm36283_probe - (error).\n");
-    //if (g_cm36283_data_ps != NULL) {
-    //  kfree(g_cm36283_data_ps);
-    //}
-
     return ret;
 
 }
@@ -2652,7 +2777,7 @@ static int cm36283_remove(struct i2c_client *client)
 
 static int cm36283_suspend(struct i2c_client *client, pm_message_t mesg)
 {
-	return 0 ;
+    return 0 ;
 }
 
 
@@ -2661,13 +2786,14 @@ static int cm36283_resume(struct i2c_client *client)
 	printk(DBGMSK_PRX_G2"[cm36283]++cm36283_resume, gpio 38 : %d\n",gpio_get_value(GPIO_PROXIMITY_INT) );
 
 	if( !g_bIsP01Attached /*&& g_proxm_switch_on && !gpio_get_value(GPIO_PROXIMITY_INT)*/) {
+		g_cm36283_earlysuspend_int = 0;
 		queue_work(cm36283_workqueue, &cm36283_ISR_work);
 		if (g_proxim_state == 1)
 			wake_lock_timeout(&proximity_wake_lock, 1 * HZ);
 	}
 
 	printk(DBGMSK_PRX_G2"[cm36283]--cm36283_resume\n");
-	return 0 ;
+    return 0 ;
 }
 
 static void cm36283_lightsensor_attached_pad(struct work_struct *work)
@@ -2675,16 +2801,17 @@ static void cm36283_lightsensor_attached_pad(struct work_struct *work)
 	printk(DBGMSK_PRX_G2"[cm36283_als] lightsensor_attached_pad()++\n");
 
 	//if HAL already turned on als, we switch to P01 al3010
-	if(g_proxm_switch_on)
+	if(g_proxm_switch_on)	{
+		phone_call_end_report_event();
 		cm36283_turn_onoff_proxm(0);
+	}
 
 	if(g_HAL_als_switch_on) 
 	{
 		printk(DBGMSK_PRX_G2"[cm36283_als] lightsensor_attached_pad, checking if P01 is attached\n");
 		printk(DBGMSK_PRX_G2"[cm36283_als] lightsensor_attached_pad, attached! switch to al3010 : %d lux\n", g_cm36283_light);
 		/*shut down cm36283_als*/
-
-		cm36283_turn_onoff_als(0);	
+		cm36283_turn_onoff_als(0);
 	}
 	printk(DBGMSK_PRX_G2"[cm36283_als] lightsensor_attached_pad()--\n");
 

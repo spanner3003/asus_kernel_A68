@@ -306,8 +306,16 @@ static void __insert_vmap_area(struct vmap_area *va)
 			p = &(*p)->rb_left;
 		else if (va->va_end > tmp_va->va_start)
 			p = &(*p)->rb_right;
-		else
+		else{
+//BSP_Joy_Lin +++ add debug log for Line Bubble
+			printk("=====[ERROR : __insert_vmap_area]====\n");
+			printk("=====[va->va_start] %lu ====\n",va->va_start);
+			printk("=====[va->va_end] %lu ====\n",va->va_end);
+			printk("=====[tmp_va->va_start] %lu ====\n",tmp_va->va_start);
+			printk("=====[tmp_va->va_end] %lu ====\n",tmp_va->va_end);
+//BSP_Joy_Lin --- add debug log for Line Bubble
 			BUG();
+			}
 	}
 
 	rb_link_node(&va->rb_node, parent, p);
