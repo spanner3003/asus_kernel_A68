@@ -210,17 +210,6 @@ static __u8 authreq_to_seclevel(__u8 authreq)
 		return BT_SECURITY_LOW;
 }
 
-static __u8 seclevel_to_authreq(__u8 level)
-{
-	switch (level) {
-	case BT_SECURITY_HIGH:
-		return SMP_AUTH_MITM | SMP_AUTH_BONDING;
-
-	default:
-		return SMP_AUTH_NONE;
-	}
-}
-
 static void build_pairing_cmd(struct l2cap_conn *conn,
 				struct smp_cmd_pairing *req,
 				struct smp_cmd_pairing *rsp,
@@ -731,68 +720,6 @@ invalid_key:
 	return 0;
 }
 
-int smp_conn_security(struct l2cap_conn *conn, __u8 sec_level)
-{
-	struct hci_conn *hcon = conn->hcon;
-	__u8 authreq;
-
-	BT_DBG("conn %p hcon %p %d req: %d",
-			conn, hcon, hcon->sec_level, sec_level);
-
-	if (IS_ERR(hcon->hdev->tfm))
-		return 1;
-
-	if (test_bit(HCI_CONN_ENCRYPT_PEND, &hcon->pend))
-		return -EINPROGRESS;
-
-	if (sec_level == BT_SECURITY_LOW)
-		return 1;
-
-
-	if (hcon->sec_level >= sec_level)
-		return 1;
-
-	authreq = seclevel_to_authreq(sec_level);
-
-	hcon->smp_conn = conn;
-	hcon->pending_sec_level = sec_level;
-
-	if ((hcon->link_mode & HCI_LM_MASTER) && !hcon->sec_req) {
-		struct link_key *key;
-
-		key = hci_find_link_key_type(hcon->hdev, conn->dst,
-							KEY_TYPE_LTK);
-
-		if (smp_encrypt_link(hcon, key) == 0)
-			goto done;
-	}
-
-	hcon->sec_req = FALSE;
-
-	if (hcon->link_mode & HCI_LM_MASTER) {
-		struct smp_cmd_pairing cp;
-
-		build_pairing_cmd(conn, &cp, NULL, authreq);
-		hcon->preq[0] = SMP_CMD_PAIRING_REQ;
-		memcpy(&hcon->preq[1], &cp, sizeof(cp));
-
-		mod_timer(&hcon->smp_timer, jiffies +
-					msecs_to_jiffies(SMP_TIMEOUT));
-
-		smp_send_cmd(conn, SMP_CMD_PAIRING_REQ, sizeof(cp), &cp);
-		hci_conn_hold(hcon);
-	} else {
-		struct smp_cmd_security_req cp;
-		cp.auth_req = authreq;
-		smp_send_cmd(conn, SMP_CMD_SECURITY_REQ, sizeof(cp), &cp);
-	}
-
-done:
-	set_bit(HCI_CONN_ENCRYPT_PEND, &hcon->pend);
-
-	return 0;
-}
-
 static int smp_cmd_encrypt_info(struct l2cap_conn *conn, struct sk_buff *skb)
 {
 	struct hci_conn *hcon = conn->hcon;
@@ -1045,10 +972,6 @@ int smp_link_encrypt_cmplt(struct l2cap_conn *conn, u8 status, u8 encrypt)
 
 	if (!status && encrypt && !hcon->sec_req)
 		return smp_distribute_keys(conn, 0);
-
-	/* Fall back to Pairing request if failed a Link Security request */
-	else if (hcon->sec_req  && (status || !encrypt))
-		smp_conn_security(conn, hcon->pending_sec_level);
 
 	hci_conn_put(hcon);
 
