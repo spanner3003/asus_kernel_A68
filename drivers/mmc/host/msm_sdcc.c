@@ -3114,7 +3114,7 @@ msmsdcc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 				(host->ddr_doubled_clk_rate != ios->clock))) {
 				host->ddr_doubled_clk_rate =
 					msmsdcc_get_sup_clk_rate(
-						host, (ios->clock * 2));
+						host, ios->clock);  //ASUS_BSP +++ Josh_Liao "Not run 96MHz on ddr50 mode during resume"
 				clock = host->ddr_doubled_clk_rate;
 			}
 		} else {
@@ -5406,7 +5406,9 @@ msmsdcc_probe(struct platform_device *pdev)
 		mmc->caps |= MMC_CAP_NONREMOVABLE;
 	mmc->caps |= MMC_CAP_SDIO_IRQ;
 
-	mmc->caps2 |= MMC_CAP2_INIT_BKOPS | MMC_CAP2_BKOPS;
+//ASUS_BSP +++ Josh_Liao "disable BKOPS"
+//	mmc->caps2 |= MMC_CAP2_INIT_BKOPS | MMC_CAP2_BKOPS;
+//ASUS_BSP --- Josh_Liao "disable BKOPS"
 
 	if (plat->is_sdio_al_client)
 		mmc->pm_flags |= MMC_PM_IGNORE_PM_NOTIFY;
