@@ -3103,8 +3103,21 @@ msmsdcc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 		/*
 		 * For DDR50 mode, controller needs clock rate to be
 		 * double than what is required on the SD card CLK pin.
+		 *
+		 * Setting DDR timing mode in controller before setting the
+		 * clock rate will make sure that card don't see the double
+		 * clock rate even for very small duration. Some eMMC
+		 * cards seems to lock up if they see clock frequency > 52MHz.
 		 */
 		if (ios->timing == MMC_TIMING_UHS_DDR50) {
+			u32 clk;
+
+			clk = readl_relaxed(host->base + MMCICLOCK);
+			clk &= ~(0x7 << 14); /* clear SELECT_IN field */
+			clk |= (3 << 14); /* set DDR timing mode */
+			writel_relaxed(clk, host->base + MMCICLOCK);
+			msmsdcc_sync_reg_wr(host);
+
 			/*
 			 * Make sure that we don't double the clock if
 			 * doubled clock rate is already set
@@ -5406,7 +5419,9 @@ msmsdcc_probe(struct platform_device *pdev)
 		mmc->caps |= MMC_CAP_NONREMOVABLE;
 	mmc->caps |= MMC_CAP_SDIO_IRQ;
 
-	mmc->caps2 |= MMC_CAP2_INIT_BKOPS | MMC_CAP2_BKOPS;
+//ASUS_BSP +++ Josh_Liao "disable BKOPS"
+//	mmc->caps2 |= MMC_CAP2_INIT_BKOPS | MMC_CAP2_BKOPS;
+//ASUS_BSP +++ Josh_Liao "disable BKOPS"
 
 	if (plat->is_sdio_al_client)
 		mmc->pm_flags |= MMC_PM_IGNORE_PM_NOTIFY;
