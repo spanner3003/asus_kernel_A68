@@ -1515,7 +1515,7 @@ static void rmi_resume_check_work(struct work_struct *work)
 {
 	struct rmi_driver_data *driver_data = rmi_get_driverdata(g_fc->rmi_dev);
 	struct f01_data *data = driver_data->f01_container->data;
-	int retry;
+	int retry, wait_count;
 	static int blocked=0;
 
 	rmi_debug(DEBUG_INFO, "[touch_synaptics] rmi_resume_check_work()++\n");
@@ -1533,7 +1533,9 @@ static void rmi_resume_check_work(struct work_struct *work)
 			do_initial_reset(g_fc->rmi_dev);
 		}
 		ASUSEvtlog("[touch_synaptics] rmi_resume_check_work-reset(%d).\n",retry);
-		msleep((retry+1)*1000);
+		for(wait_count=0; wait_count<((retry+1)*10) && g_XY == 0xFFFFFFFF && !data->suspended; wait_count++) {
+			msleep(100);
+		}
 	}
 	if((g_XY == 0xFFFFFFFF)&&(retry==RETRY_MAX)){
 		if(blocked>=2){

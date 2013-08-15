@@ -23,12 +23,18 @@
 #include <linux/export.h>
 extern int g_user_dbg_mode;
 
+#include <mach/msm_iomap.h>
 #include <linux/rtc.h>
 #include "rtmutex_common.h"
 
 int entering_suspend = 0;
 unsigned int PRINTK_BUFFER;
 unsigned int RTB_BUFFER;
+unsigned int RPM_LOG_BUFFER=0;
+unsigned int RPM_LOG_BUFFER_SIZE= 24 * SZ_1K;
+unsigned int RPM_CODE_RAM_PHYS=0x00020000;
+unsigned int RPM_CODE_BUFFER=0;
+unsigned int RPM_CODE_BUFFER_SIZE= 160 * SZ_1K;
 extern struct timezone sys_tz;
 #define RT_MUTEX_HAS_WAITERS	1UL
 #define RT_MUTEX_OWNER_MASKALL	1UL
@@ -891,6 +897,90 @@ void save_last_shutdown_log(char* filename)
 
 }
 
+#if defined(CONFIG_MSM_RTB)
+extern struct msm_rtb_state msm_rtb;
+
+int g_saving_rtb_log = 1;
+
+void save_rtb_log(void)
+{
+	char *rtb_log;
+	char rtb_log_path[256] = {0};
+    struct rtc_time tm;
+    int file_handle;
+    
+    asus_rtc_read_time(&tm);    
+    rtb_log = (char*)msm_rtb.rtb;
+    snprintf(rtb_log_path, sizeof(rtb_log_path)-1, "/data/log/rtb_%04d%02d%02d-%02d%02d%02d.bin", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
+
+    initKernelEnv();
+    file_handle = sys_open(rtb_log_path, O_CREAT|O_RDWR|O_SYNC, 0);
+    if(!IS_ERR((const void *)file_handle))
+    {
+        sys_write(file_handle, (unsigned char*)rtb_log, msm_rtb.size);
+        sys_close(file_handle);
+    }
+    deinitKernelEnv();  	
+    
+}
+#endif
+
+void save_rpm_log(void)
+{
+	char *rpm_log;
+	char rpm_log_path[256] = {0};
+    struct rtc_time tm;
+    int file_handle;
+    
+    if ( RPM_LOG_BUFFER == 0 )
+    {
+		printk("%s: RPM_LOG_BUFFER is NULL\n", __func__);
+		return;
+	}
+    
+    asus_rtc_read_time(&tm);    
+    rpm_log = (char*)RPM_LOG_BUFFER;
+    snprintf(rpm_log_path, sizeof(rpm_log_path)-1, "/data/log/rpm_log_%04d%02d%02d-%02d%02d%02d.bin", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
+
+    initKernelEnv();
+    file_handle = sys_open(rpm_log_path, O_CREAT|O_RDWR|O_SYNC, 0);
+    if(!IS_ERR((const void *)file_handle))
+    {
+        sys_write(file_handle, rpm_log, RPM_LOG_BUFFER_SIZE);
+        sys_close(file_handle);
+    }
+    deinitKernelEnv();  	
+    
+}
+
+void save_rpm_code(void)
+{
+	char *rpm_log;
+	char rpm_log_path[256] = {0};
+    struct rtc_time tm;
+    int file_handle;
+    
+    if ( RPM_CODE_BUFFER == 0 )
+    {
+		printk("%s: RPM_LOG_BUFFER is NULL\n", __func__);
+		return;
+	}
+    
+    asus_rtc_read_time(&tm);    
+    rpm_log = (char*)RPM_CODE_BUFFER;
+    snprintf(rpm_log_path, sizeof(rpm_log_path)-1, "/data/log/rpm_code_%04d%02d%02d-%02d%02d%02d.bin", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
+
+    initKernelEnv();
+    file_handle = sys_open(rpm_log_path, O_CREAT|O_RDWR|O_SYNC, 0);
+    if(!IS_ERR((const void *)file_handle))
+    {
+        sys_write(file_handle, rpm_log, RPM_CODE_BUFFER_SIZE);
+        sys_close(file_handle);
+    }
+    deinitKernelEnv();  	
+    
+}
+
 typedef struct tzbsp_dump_cpu_ctx_s
 {
     unsigned int mon_lr;
@@ -972,13 +1062,14 @@ void get_last_shutdown_log(void)
     
     last_shutdown_log = (char*)PRINTK_BUFFER;//(phys_to_virt(PRINTK_BUFFER);
     last_shutdown_log_addr = (unsigned int *)((unsigned int)last_shutdown_log + (unsigned int)PRINTK_BUFFER_SLOT_SIZE);
+    printk("get_last_shutdown_log: last_shutdown_log_addr=0x%08x, value=0x%08x\n", (unsigned int)last_shutdown_log_addr, *last_shutdown_log_addr);
     if(*last_shutdown_log_addr == (unsigned int)PRINTK_BUFFER_MAGIC)
     {
         save_last_shutdown_log("LastShutdown");
             //save_last_watchdog_reg();
     }
     printk_buffer_rebase();
-    *last_shutdown_log_addr = PRINTK_BUFFER_MAGIC;
+    //~ *last_shutdown_log_addr = PRINTK_BUFFER_MAGIC;
 
 }
 EXPORT_SYMBOL(get_last_shutdown_log);
@@ -1025,6 +1116,24 @@ static ssize_t asusdebug_write(struct file *file, const char __user *buf, size_t
 		g_user_dbg_mode = 0;
 		printk("Kernel dbg mode = %d\n", g_user_dbg_mode);
 	}
+	else if(strncmp(messages, "panic", 5) == 0)
+    {
+//        printk_lcd("panic");
+        panic("panic test");
+    } 
+    else if(strncmp(messages, "slowlog", 7) == 0)
+    {
+		printk("start to gi chk\n");
+		save_all_thread_info();
+		
+		msleep(5 * 1000);
+		
+		printk("start to gi delta\n");
+		delta_all_thread_info();
+		save_phone_hang_log();
+        return count;
+    }	
+
 	return count;
 #endif
 // --- ASUS_BSP : add for user build
@@ -1464,6 +1573,21 @@ static struct file_operations turnon_asusdebug_proc_ops = {
 };
 
 
+enum {
+	MSM_RPM_LOG_PAGE_INDICES,
+	MSM_RPM_LOG_PAGE_BUFFER,
+	MSM_RPM_LOG_PAGE_COUNT
+};
+struct msm_rpm_log_platform_data {
+	u32 reg_offsets[MSM_RPM_LOG_PAGE_COUNT];
+	u32 log_len;
+	u32 log_len_mask;
+	phys_addr_t phys_addr_base;
+	u32 phys_size;
+	void __iomem *reg_base;
+};
+extern struct msm_rpm_log_platform_data msm_rpm_log_pdata;
+
 static int __init proc_asusdebug_init(void)
 {
 	
@@ -1472,6 +1596,16 @@ static int __init proc_asusdebug_init(void)
     proc_create("asusevtlog-switch", S_IRWXUGO, NULL, &proc_evtlogswitch_operations);
     proc_create("asusdebug-switch", S_IRWXUGO, NULL, &turnon_asusdebug_proc_ops);
     PRINTK_BUFFER = (unsigned int)ioremap(PRINTK_BUFFER, PRINTK_BUFFER_SIZE);
+    RPM_LOG_BUFFER = (unsigned int)ioremap(APQ8064_RPM_PHYS, RPM_LOG_BUFFER_SIZE);
+
+	printk("RPM_LOG_BUFFER=%p, APQ8064_RPM_PHYS=%p, RPM_LOG_BUFFER_SIZE=%d\n", 
+				(void *) RPM_LOG_BUFFER, (void *) APQ8064_RPM_PHYS, 
+				RPM_LOG_BUFFER_SIZE);
+	RPM_CODE_BUFFER = (unsigned int)ioremap(RPM_CODE_RAM_PHYS, RPM_CODE_BUFFER_SIZE);
+	printk("RPM_CODE_BUFFER=%p, RPM_CODE_RAM_PHYS=%p, RPM_CODE_BUFFER_SIZE=%d\n", 
+				(void *) RPM_CODE_BUFFER, (void *) RPM_CODE_RAM_PHYS, 
+				RPM_CODE_BUFFER_SIZE);
+
     mutex_init(&mA);
     fake_mutex.owner = current;
 	fake_mutex.name = " fake_mutex";

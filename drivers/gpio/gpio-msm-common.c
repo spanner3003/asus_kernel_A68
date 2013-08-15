@@ -32,7 +32,7 @@
 #include "gpio-msm-common.h"
 //++Ledger
 #include "linux/console.h"
-int gpio_irq_cnt, gpio_resume_irq[]={};
+int gpio_irq_cnt, gpio_resume_irq[16];
 
 #define _INTR_ENABLE_BIT        0x1
 
@@ -638,7 +638,10 @@ void msm_gpio_show_resume_irq(void)
 {
 	unsigned long irq_flags;
 	int i, irq, intstat;
-
+	int j;
+ 
+	for(j = 0; j < 16; j++)
+		gic_resume_irq[j] = 0;
         gpio_irq_cnt=0;
 
 	if (!msm_show_resume_irq_mask)
@@ -651,8 +654,10 @@ void msm_gpio_show_resume_irq(void)
 			irq = msm_gpio_to_irq(&msm_gpio.gpio_chip, i);
 			pr_warning("[PM]GPIO triggered: %d\n", irq-NR_MSM_IRQS);
 //++Ledger
-                        gpio_resume_irq[gpio_irq_cnt]=irq-NR_MSM_IRQS;
-                        gpio_irq_cnt++;
+			if (gic_irq_cnt < 16) {
+				gpio_resume_irq[gpio_irq_cnt]=irq-NR_MSM_IRQS;
+				gpio_irq_cnt++;
+			}
 //--Ledger
 		}
 	}

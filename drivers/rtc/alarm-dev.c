@@ -161,12 +161,39 @@ from_old_alarm_set:
 		wake_up(&alarm_wait_queue);
 		spin_unlock_irqrestore(&alarm_slock, flags);
         { // jack added to get correct time for last shutdown log +++++++++++
+#if defined(CONFIG_MSM_RTB)
+			extern int g_saving_rtb_log;
+			void save_rtb_log(void);
+#endif			
+			unsigned int *last_shutdown_log_addr;
             void get_last_shutdown_log(void);
+            
+            last_shutdown_log_addr = (unsigned int *)((unsigned int)PRINTK_BUFFER + (unsigned int)PRINTK_BUFFER_SLOT_SIZE);
+            
             if(!asus_rtc_set)
             {  
                 asus_rtc_set = 1;
-                get_last_shutdown_log();       
+                get_last_shutdown_log();
+                printk("rtc: get_last_shutdown_log: last_shutdown_log_addr=0x%08x, value=0x%08x\n", (unsigned int)last_shutdown_log_addr, *last_shutdown_log_addr);
+#if defined(CONFIG_MSM_RTB)                
+                if ( (*last_shutdown_log_addr)==(unsigned int)PRINTK_BUFFER_MAGIC )
+					save_rtb_log();
+#endif					
+				{
+					void save_rpm_log(void);
+					void save_rpm_code(void);
+					if ( (*last_shutdown_log_addr)==(unsigned int)PRINTK_BUFFER_MAGIC )
+					{
+						save_rpm_log();
+						save_rpm_code();
+					}
+				}
+					
+				(*last_shutdown_log_addr)=(unsigned int)PRINTK_BUFFER_MAGIC;
             }
+#if defined(CONFIG_MSM_RTB)
+            g_saving_rtb_log = 0;
+#endif            
         }// jack added to get correct time for last shutdown log ------------		
 		if (rv < 0)
 			goto err1;

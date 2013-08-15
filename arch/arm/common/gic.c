@@ -76,7 +76,7 @@ struct gic_chip_data {
 #endif
 };
 
-int gic_irq_cnt,gic_resume_irq[]={}; //Ledger
+int gic_irq_cnt,gic_resume_irq[8]; //Ledger
 
 static DEFINE_RAW_SPINLOCK(irq_controller_lock);
 
@@ -278,8 +278,12 @@ static void gic_show_resume_irq(struct gic_chip_data *gic)
 	u32 enabled;
 	unsigned long pending[32];
 	void __iomem *base = gic_data_dist_base(gic);
+	int j;
+ 
+	for(j = 0; j < 8; j++)
+		gic_resume_irq[j] = 0;
+	gic_irq_cnt=0;  //Ledger
 
-        gic_irq_cnt=0;  //Ledger
 	if (!msm_show_resume_irq_mask)
 		return;
 
@@ -296,12 +300,14 @@ static void gic_show_resume_irq(struct gic_chip_data *gic)
 	     i = find_next_bit(pending, gic->max_irq, i+1)) {
 
 // 		pr_warning("[PM]IRQs triggered: %d ", i + gic->irq_offset-GIC_SPI_START);
-                    if ( i + gic->irq_offset !=TLMM_MSM_SUMMARY_IRQ) {       //It's always appear...
-                                pr_warning("[PM]IRQs triggered: %d ", i + gic->irq_offset-GIC_SPI_START);
+		if ( i + gic->irq_offset !=TLMM_MSM_SUMMARY_IRQ) {       //It's always appear...
+			pr_warning("[PM]IRQs triggered: %d ", i + gic->irq_offset-GIC_SPI_START);
 //++Ledger
-                                gic_resume_irq[gic_irq_cnt]=i + gic->irq_offset-GIC_SPI_START;
-                                gic_irq_cnt++;
-                        }
+			if (gic_irq_cnt < 8) {
+				gic_resume_irq[gic_irq_cnt]=i + gic->irq_offset-GIC_SPI_START;
+				gic_irq_cnt++;
+			}
+		}
 //--Ledger
         //ASUS_BSP+++ "for wlan wakeup trace"
         if( (i + gic->irq_offset-GIC_SPI_START) == 202 ){

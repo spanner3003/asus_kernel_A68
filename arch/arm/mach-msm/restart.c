@@ -135,6 +135,11 @@ static void __msm_power_off(int lower_pshold)
 
 static void msm_power_off(void)
 {
+	// Normal power off. Clean the printk buffer magic
+	unsigned int *last_shutdown_log_addr;
+	last_shutdown_log_addr = (unsigned int *)((unsigned int)PRINTK_BUFFER + (unsigned int)PRINTK_BUFFER_SLOT_SIZE);
+	*last_shutdown_log_addr = 0;
+		
 	printk(KERN_CRIT "Clean asus_global...\n");
 	memset(&asus_global,0,sizeof(asus_global));	
 	printk(KERN_CRIT "&asus_global = 0x%x\n",(unsigned int)&asus_global);
@@ -189,6 +194,7 @@ static irqreturn_t resout_irq_handler(int irq, void *dev_id)
 
 void msm_restart(char mode, const char *cmd)
 {
+	unsigned int *last_shutdown_log_addr;
 
 #ifdef CONFIG_MSM_DLOAD_MODE
 
@@ -211,6 +217,13 @@ void msm_restart(char mode, const char *cmd)
 
 	pm8xxx_reset_pwr_off(1);
 
+	if (!in_panic)
+	{
+		// Normal reboot. Clean the printk buffer magic     
+		last_shutdown_log_addr = (unsigned int *)((unsigned int)PRINTK_BUFFER + (unsigned int)PRINTK_BUFFER_SLOT_SIZE);
+		*last_shutdown_log_addr = 0;
+	}
+
 	if (cmd != NULL) {
 		if (!strncmp(cmd, "bootloader", 10)) {
 			__raw_writel(0x77665500, restart_reason);
@@ -222,7 +235,7 @@ void msm_restart(char mode, const char *cmd)
 			__raw_writel(0x6f656d00 | code, restart_reason);
 		} else {
 			__raw_writel(0x77665501, restart_reason);
-		}
+		}		
 	}else
         __raw_writel(0x73727374, restart_reason);
 

@@ -150,6 +150,9 @@ static int g_LastMaxExp = 0;
 static int g_LastMiniISO = 0;
 //ASUS_BSP --- Stimber "Modify for preview/video frame rate"
 
+static bool g_is_max_exp_on = false;
+
+
 struct completion g_iCatch_comp;
 static bool caf_mode = false;
 static int g_pre_res = MSM_SENSOR_INVALID_RES;
@@ -1995,6 +1998,12 @@ int sensor_set_mode(int  res)
              pr_info("%s: Burst capture abort\n",__func__);
              sensor_write_reg(imx091_s_ctrl.sensor_i2c_client->client, 0x7122, 0x01);
        }
+
+	   if(g_is_max_exp_on){
+           setMaxExp(0);
+			g_is_max_exp_on = false;
+           pr_info("%s: Reset max exp to default\n", __func__);
+       }
        
        switch(res){
             case MSM_SENSOR_RES_QTR:            //MODE_1
@@ -2008,7 +2017,6 @@ int sensor_set_mode(int  res)
                 }
                 
                 setFixFPS(0);
-                setMaxExp(30);
                 setMiniISO(0);
 		setCaptureVideoMode(0); //default : capture preview mode, ASUS_BSP jim3_lin "Modify binning sum for camera preview/video frame rate"
                 
@@ -2020,7 +2028,6 @@ int sensor_set_mode(int  res)
                 pr_info("%s: MODE_2\n",__func__);
 
                 setFixFPS(0);
-                setMaxExp(30);
                 setMiniISO(400);
 		setCaptureVideoMode(2); //High speed video preview mode, ASUS_BSP jim3_lin "Modify binning sum for camera preview/video frame rate"
                 
@@ -2032,7 +2039,6 @@ int sensor_set_mode(int  res)
                 pr_info("%s: MODE_3\n",__func__);
 
                 setFixFPS(0);
-                setMaxExp(30);
                 setMiniISO(400);
 		setCaptureVideoMode(2); //High speed video preview mode, ASUS_BSP jim3_lin "Modify binning sum for camera preview/video frame rate"
                 
@@ -2044,7 +2050,6 @@ int sensor_set_mode(int  res)
                 pr_info("%s: MODE_4\n",__func__);
 
 				 setFixFPS(0);
-                setMaxExp(0);
                 setMiniISO(0);
 		setCaptureVideoMode(3); //Zsl capture, ASUS_BSP jim3_lin "Modify binning sum for camera preview/video frame rate"
 
@@ -2056,7 +2061,6 @@ int sensor_set_mode(int  res)
 		        pr_info("%s: MODE_5\n",__func__);
 
                 setFixFPS(0);
-                setMaxExp(0);
                 setMiniISO(0);
 		setCaptureVideoMode(3); //Zsl capture, ASUS_BSP jim3_lin "Modify binning sum for camera preview/video frame rate"
                 
@@ -2068,7 +2072,6 @@ int sensor_set_mode(int  res)
                 pr_info("%s: MODE_6\n",__func__);
                 
                 setFixFPS(0);
-                setMaxExp(0);
                 setMiniISO(0);
 		setCaptureVideoMode(1); //Normal video preview mode, ASUS_BSP jim3_lin "Modify binning sum for camera preview/video frame rate"
                 
@@ -2086,7 +2089,6 @@ int sensor_set_mode(int  res)
                 }         
 
                 setFixFPS(0);
-                setMaxExp(0);
                 setMiniISO(0);
 		setCaptureVideoMode(3); //Zsl capture, ASUS_BSP jim3_lin "Modify binning sum for camera preview/video frame rate"
                     
@@ -2119,7 +2121,6 @@ int sensor_set_mode(int  res)
                 pr_info("%s: MODE_8\n",__func__);
 
                 setFixFPS(0);
-                setMaxExp(0);
                 setMiniISO(0);
 		setCaptureVideoMode(3); //Zsl capture, ASUS_BSP jim3_lin "Modify binning sum for camera preview/video frame rate"
                 
@@ -2135,7 +2136,6 @@ int sensor_set_mode(int  res)
                 pr_info("%s: MODE_10\n",__func__);
 
                 setFixFPS(0);
-                setMaxExp(0);
                 setMiniISO(0);
 		setCaptureVideoMode(3); //Zsl capture, ASUS_BSP jim3_lin "Modify binning sum for camera preview/video frame rate"
                 
@@ -4037,9 +4037,11 @@ void iCatch_set_general_cmd(struct general_cmd_cfg *cmd)
                     if(cmd->cmd_value == 1){    // GRYO detect Moving
                         //sensor_write_reg(imx091_s_ctrl.sensor_i2c_client->client, 0x7126, 0x01);
                         setMaxExp(60);//set Preview Max. Exposure Time as 1/60
+                        g_is_max_exp_on = true;
 					}else{                                  // GYRO detect Stop
                         //sensor_write_reg(imx091_s_ctrl.sensor_i2c_client->client, 0x7126, 0x00);
                         setMaxExp(0);//disable Max. Exposure Time function
+                        g_is_max_exp_on = false;
 					}
                     break;
 		case GENERAL_CMD_TAE:	
@@ -4054,16 +4056,18 @@ void iCatch_set_general_cmd(struct general_cmd_cfg *cmd)
 			if(cmd->cmd_value){
 				pr_info("Fixed fps\n");
 				setFixFPS(30);  //fix 30 fps
-                setMaxExp(0);   //reset max exp.
                 setMiniISO(0);  //reset min iso to default
 		setCaptureVideoMode(2); //High speed video preview mode, ASUS_BSP jim3_lin "Modify binning sum for camera preview/video frame rate"
 			}else{
 				pr_info("Dynamic fps\n");
 				setFixFPS(0);   //reset fps fix
-                setMaxExp(30);  //set max exp. to 1/30
                 setMiniISO(0);  //reset min iso to default
 		setCaptureVideoMode(0); //default : capture preview mode, ASUS_BSP jim3_lin "Modify binning sum for camera preview/video frame rate"
 			}
+			if(g_is_max_exp_on){
+                setMaxExp(0);
+                g_is_max_exp_on = false;
+            }
 			break;
 		default:
 			pr_info("%s cmd_id(%d) is not support \n",__func__,cmd->cmd_id);

@@ -2135,7 +2135,7 @@ struct platform_device apq8064_rpm_stat_device = {
 	},
 };
 
-static struct msm_rpm_log_platform_data msm_rpm_log_pdata = {
+struct msm_rpm_log_platform_data msm_rpm_log_pdata = {
 	.phys_addr_base = 0x0010C000,
 	.reg_offsets = {
 		[MSM_RPM_LOG_PAGE_INDICES] = 0x00000080,
